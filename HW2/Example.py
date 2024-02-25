@@ -84,6 +84,7 @@ def addUser(ID: int, name: str) -> ReturnValue:
         conn = Connector.DBConnector()
         query = sql.SQL("INSERT INTO Users(id, name) VALUES({id}, {username})").format(id=sql.Literal(ID),
                                                                                        username=sql.Literal(name))
+
         rows_effected, _ = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         print(e)
