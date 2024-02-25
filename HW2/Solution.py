@@ -12,19 +12,112 @@ from Business.Apartment import Apartment
 
 
 # ---------------------------------- CRUD API: ----------------------------------
+Table_Names=["Owner","Apartment","Customer"]
 
+
+def make_table(tableName,attributes):
+    conn = None
+    try:
+        conn = Connector.DBConnector()
+        query="CREATE TABLE "+tableName+""
+        for att in attributes:
+            query=query+att+",\n"
+        query +=");"
+        conn = Connector.DBConnector()
+        conn.execute(query)
+    except DatabaseException.ConnectionInvalid as e:
+        print(e)
+    except DatabaseException.NOT_NULL_VIOLATION as e:
+        print(e)
+    except DatabaseException.CHECK_VIOLATION as e:
+        print(e)
+    except DatabaseException.UNIQUE_VIOLATION as e:
+        print(e)
+    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
+        print(e)
+    except Exception as e:
+        print(e)
+    finally:
+        # will happen any way after try termination or exception handling
+        conn.close()
+    pass
 def create_tables():
-    # TODO: implement
+    attributes=[]
+    attributes.append("Owner ID INTEGER UNIQUE CHECK (Owner ID>0)")
+    attributes.append("Name STRING NOT NULL")
+    make_table("Owner",attributes)
+
+    attributes = []
+    attributes.append("Apartment ID INTEGER UNIQUE CHECK (Apartment ID>0)")
+    attributes.append("Address STRING NOT NULL")
+    attributes.append("City STRING NOT NULL")
+    attributes.append("Country STRING NOT NULL")
+    attributes.append("Size INTEGER CHECK (Size>0)")
+    attributes.append("CONSTRAINT UC_Apartment UNIQUE (Address,City,Country)")
+    make_table("Apartment", attributes)
+
+    attributes = []
+    attributes.append("Customer ID INTEGER UNIQUE CHECK (Customer ID>0)")
+    attributes.append("Customer name STRING NOT NULL")
+    make_table("Customer", attributes)
     pass
 
 
 def clear_tables():
-    # TODO: implement
+    conn = None
+    try:
+        conn = Connector.DBConnector()
+        for tab in Table_Names:
+            conn.execute("DELETE FROM "+tab+";")
+    except DatabaseException.ConnectionInvalid as e:
+        # do stuff
+        print(e)
+    except DatabaseException.NOT_NULL_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.CHECK_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.UNIQUE_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
+        # do stuff
+        print(e)
+    except Exception as e:
+        print(e)
+    finally:
+        # will happen any way after code try termination or exception handling
+        conn.close()
     pass
 
 
 def drop_tables():
-    # TODO: implement
+    conn = None
+    try:
+        conn = Connector.DBConnector()
+        for tab in Table_Names:
+            conn.execute("DROP TABLE " + tab + ";")
+    except DatabaseException.ConnectionInvalid as e:
+        # do stuff
+        print(e)
+    except DatabaseException.NOT_NULL_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.CHECK_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.UNIQUE_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
+        # do stuff
+        print(e)
+    except Exception as e:
+        print(e)
+    finally:
+        # will happen any way after code try termination or exception handling
+        conn.close()
     pass
 
 
