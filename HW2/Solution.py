@@ -94,11 +94,12 @@ def create_tables():
     attributes.append("start_date DATE")
     attributes.append("end_date DATE")
     attributes.append("total_price INTEGER CHECK (total_price>0)")
-    attributes.append("CONSTRAINT UC_Apartment UNIQUE (customer_id,apartment_id )")
+    attributes.append("CONSTRAINT UC_Apartment UNIQUE (customer_id,apartment_id)")
     make_table("Reservations", attributes)
 
 
-    #something related to owner_reservation
+    #some view related to owner_reservation
+
     pass
 
 
@@ -414,6 +415,7 @@ def get_apartment_rating(apartment_id: int) -> float:
     conn = None
     try:
         conn = Connector.DBConnector()
+        sub_query="(SELECT get_owner_rating(Owner ID) from Owner_Reservations WHERE Apartment ID=apartment_id)"
         res=conn.execute("SELECT AVG(RATING) FROM ")
         return res
     except DatabaseException.ConnectionInvalid as e:
@@ -443,7 +445,9 @@ def get_owner_rating(owner_id: int) -> float:
     conn = None
     try:
         conn = Connector.DBConnector()
-        conn.execute("SELECT AVG(RATING) FROM ")
+        sub_query="(SELECT get_apartment_rating(Apartment ID) from Owner_Reservations WHERE Owner ID=owner_id)"
+        res=conn.execute("SELECT AVG(RATING) FROM  "+sub_query)
+        return res
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -471,7 +475,8 @@ def get_top_customer() -> Customer:
     conn = None
     try:
         conn = Connector.DBConnector()
-        res = conn.execute("SELECT MAX(customer_count) FROM (SELECT COUNT(customer_id) AS customer_count FROM Reservations GROUP BY customer_id)")
+        sub_query="(SELECT COUNT(customer_id) AS customer_count FROM Reservations GROUP BY customer_id)"
+        res = conn.execute("SELECT MAX(customer_count) FROM "+sub_query)
         return res
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
