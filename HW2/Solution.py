@@ -21,8 +21,7 @@ def make_table(tableName,attributes):
         conn = Connector.DBConnector()
         query="CREATE TABLE "+tableName+" \n ( "
         query += ",\n".join(attributes)
-        query +=");"
-        conn = Connector.DBConnector()
+        query +=" ); "
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         print(e)
@@ -73,6 +72,7 @@ def create_tables():
     attributes.append("Name TEXT NOT NULL")
     make_table("Owner",attributes)
 
+    #Apt
     attributes = []
     attributes.append("Apartment_ID INTEGER UNIQUE CHECK (Apartment_ID>0)")
     attributes.append("Address TEXT NOT NULL")
@@ -103,16 +103,16 @@ def create_tables():
     attributes.append("review_date DATE")
     attributes.append("rating INTEGER CHECK (rating>0 AND rating<11)")
     attributes.append("review_text TEXT")
-    attributes.append("CONSTRAINT UC_Apartment UNIQUE (customer_id,apartment_id)")
+    attributes.append("CONSTRAINT UC_Resrvations UNIQUE (customer_id,apartment_id)")
     make_table("Apartment_Reviews", attributes)
     
     #make the table of owner and his apartments
     attributes = []
     attributes.append("owner_id INTEGER CHECK (owner_id>0)")
     attributes.append("apartment_id INTEGER UNIQUE CHECK (apartment_id>0)")
-    attributes.append("CONSTRAINT UC_Apartment UNIQUE (owner_id,apartment_id)")
+    attributes.append("CONSTRAINT UC_Owner_Apts UNIQUE (owner_id,apartment_id)")
     make_table("Owner_Apartments", attributes)
-    clear_tables()
+
 
 
 def clear_tables():
@@ -138,7 +138,8 @@ def clear_tables():
         print(e)
     except Exception as e:
         print(e)
-    finally:
+
+    finally :
         # will happen any way after code try termination or exception handling
         conn.close()
     pass
