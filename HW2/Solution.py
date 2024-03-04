@@ -486,8 +486,9 @@ def get_top_customer() -> Customer:
     conn = None
     try:
         conn = Connector.DBConnector()
-        sub_query="(SELECT COUNT(apartment_id) AS customer_count FROM Reservations GROUP BY customer_id)"
-        res = conn.execute("SELECT MAX(customer_count) FROM "+sub_query)
+        sub_query="(SELECT customer_id,COUNT(apartment_id) AS customer_count FROM Reservations GROUP BY customer_id)"
+        sub_query2="(SELECT customer_id,MAX(customer_count) FROM "+sub_query+")"
+        res = conn.execute("SELECT * from Customer WHERE ")
         return res
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
