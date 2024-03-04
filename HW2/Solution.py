@@ -19,10 +19,10 @@ def make_table(tableName,attributes):
     conn = None
     try:
         conn = Connector.DBConnector()
-        query="CREATE TABLE "+tableName+""
-        for att in attributes:
-            query=query+att+",\n"
-        query +=");"
+        query="CREATE TABLE "+tableName+"\n("
+        for i in range(attributes.len-1):
+            query=query+attributes[i]+",\n"
+        query = query + attributes[attributes.len-1] +");"
         conn = Connector.DBConnector()
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
@@ -138,6 +138,7 @@ def drop_tables():
         conn = Connector.DBConnector()
         for tab in Table_Names:
             conn.execute("DROP TABLE " + tab + ";")
+        conn.execute("DROP VIEW Owner_reviews;")
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -160,6 +161,13 @@ def drop_tables():
         conn.close()
     pass
 
+#temp func to make review_owner tab
+def make_owner_reviews():
+    attributes = []
+    attributes.append("SELECT Apartment_ID,Owner_ID,rating ")
+    attributes.append("FROM Owner_Apartments LEFT OUTER JOIN Apartment_Reviews ")
+    attributes.append("ON Owner_Apartments.Apartment_ID=Apartment_Reviews.Apartment_ID")
+    make_table("Owner_reviews", attributes)
 
 def add_owner(owner: Owner) -> ReturnValue:
     conn = None
@@ -414,9 +422,10 @@ def get_owner_apartments(owner_id: int) -> List[Apartment]:
 def get_apartment_rating(apartment_id: int) -> float:
     conn = None
     try:
+        make_owner_reviews()
         conn = Connector.DBConnector()
-        sub_query="(SELECT get_owner_rating(Owner ID) from Owner_Reservations WHERE Apartment ID=apartment_id)"
-        res=conn.execute("SELECT AVG(RATING) FROM ")
+        query="(SELECT AVG(Rating) from Owner_Reviews WHERE Apartment_ID=apartment_id)"
+        res=conn.execute(query)
         return res
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
@@ -444,9 +453,11 @@ def get_apartment_rating(apartment_id: int) -> float:
 def get_owner_rating(owner_id: int) -> float:
     conn = None
     try:
+        make_owner_reviews()
         conn = Connector.DBConnector()
-        sub_query="(SELECT get_apartment_rating(Apartment ID) from Owner_Reservations WHERE Owner ID=owner_id)"
-        res=conn.execute("SELECT AVG(RATING) FROM  "+sub_query)
+        sub_query="(SELECT AVG(COALESCE(Rating,0)) from Owner_Reviews GROUP BY Apartment_ID)"
+        query = "(SELECT AVG"+ sub_query
+        res=conn.execute(query)
         return res
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
