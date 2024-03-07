@@ -201,16 +201,23 @@ def make_customer_apartments():
 
 
 def make_customer_ratio(customer_ID):
+    attributes = []
     make_customer_apartments()
-    cust_apartments=("(SELECT apartment_id AS ai"
-               "FROM Customer_apartments"
-               "WHERE Customer_apartments.customer_id=customer_id)")
 
+    #need to drop them immediately????
 
-
-
+    attributes.append("SELECT apartment_id")
+    attributes.append("FROM Customer_apartments")
+    attributes.append("WHERE Customer_apartments.customer_id=customer_id")
+    make_view("Cust1_apartments", attributes)
 
     attributes = []
+    attributes.append("SELECT customer_id,apartment_id,rating ")
+    attributes.append("FROM Apartment_Reviews GROUP BY apartment_id ")
+    attributes.append("INNER JOIN Cust1_apartments ")
+    attributes.append("ON Cust1_apartments.Apartment_ID=Apartment_Reviews.Apartment_ID ")
+    attributes.append("AND Cust1_apartments.Customer_ID=Apartment_Reviews.Customer_ID ")
+    attributes.append("AND Cust1_apartments.Customer_ID!=customer_ID")
     make_view("Customer_ratios", attributes)
 
 def add_owner(owner: Owner) -> ReturnValue:
