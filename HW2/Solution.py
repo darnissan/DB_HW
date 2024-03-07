@@ -97,8 +97,22 @@ def create_tables():
     attributes.append("CONSTRAINT UC_Apartment UNIQUE (customer_id,apartment_id)")
     make_table("Reservations", attributes)
 
+    # reviews
+    attributes = []
+    attributes.append("customer_id INTEGER CHECK (customer_id>0)")
+    attributes.append("apartment_id INTEGER UNIQUE CHECK (apartment_id>0)")
+    attributes.append("review_date DATE")
+    attributes.append("rating INTEGER CHECK (rating>0 AND rating<11)")
+    attributes.append("review_text TEXT")
+    attributes.append("CONSTRAINT UC_Resrvations UNIQUE (customer_id,apartment_id)")
+    make_table("Apartment_Reviews", attributes)
 
-    #some view related to owner_reservation
+    # owner and his apartments
+    attributes = []
+    attributes.append("owner_id INTEGER CHECK (owner_id>0)")
+    attributes.append("apartment_id INTEGER UNIQUE CHECK (apartment_id>0)")
+    attributes.append("CONSTRAINT UC_Owner_Apts UNIQUE (owner_id,apartment_id)")
+    make_table("Owner_Apartments", attributes)
 
     pass
 
@@ -169,12 +183,35 @@ def make_owner_reviews():
     attributes.append("ON Owner_Apartments.Apartment_ID=Apartment_Reviews.Apartment_ID")
     make_view("Owner_reviews", attributes)
 
+def make_owner_city_apartments():
+    attributes = []
+    attributes.append("SELECT Owner_ID,Name,City ")
+    attributes.append("FROM Owner_Apartments INNER JOIN Apartment_Reviews ")
+    attributes.append("ON Owner_Apartments.Owner_ID=Apartment_Reviews.Owner_ID ")
+    attributes.append("AND Owner_Apartments.Apartment_ID=Apartment_Reviews.Apartment_ID ")
+    attributes.append("INNER JOIN Owner ON Owner_Apartments.Owner_ID= Owner.Owner_ID;)")
+    make_view("Owner_city_apartments", attributes)
+
 def make_customer_apartments():
     attributes = []
-    attributes.append("SELECT customer_id,COUNT(apartment_id) AS customer_count ")
+    attributes.append("SELECT customer_id,apartment_id")
     attributes.append("FROM Reservations GROUP BY customer_id")
     attributes.append("ON Owner_Apartments.Apartment_ID=Apartment_Reviews.Apartment_ID")
     make_view("Customer_apartments", attributes)
+
+
+def make_customer_ratio(customer_ID):
+    make_customer_apartments()
+    cust_apartments=("(SELECT apartment_id AS ai"
+               "FROM Customer_apartments"
+               "WHERE Customer_apartments.customer_id=customer_id)")
+
+
+
+
+
+    attributes = []
+    make_view("Customer_ratios", attributes)
 
 def add_owner(owner: Owner) -> ReturnValue:
     conn = None
@@ -494,9 +531,10 @@ def get_top_customer() -> Customer:
     try:
         conn = Connector.DBConnector()
         make_customer_apartments()
-        sub_query="(SELECT customer_id,MAX(customer_count) FROM Customer_apartments)"
-        sub_query1 = "(SELECT customer_id FROM" + sub_query + " LIMIT 1)"
-        res = conn.execute("SELECT * FROM Customer WHERE "+sub_query1+"=customer_id")
+        sub_query1="(SELECT customer_id,COUNT(apartment_id) AS customer_count FROM Customer_apartments)"
+        sub_query2="(SELECT customer_id,MAX(customer_count) FROM "+sub_query1+")"
+        sub_query3 = "(SELECT customer_id FROM" + sub_query2 + " LIMIT 1)"
+        res = conn.execute("SELECT * FROM Customer WHERE "+sub_query3+"=customer_id")
         return res
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
@@ -552,7 +590,34 @@ def reservations_per_owner() -> List[Tuple[str, int]]:
 # ---------------------------------- ADVANCED API: ----------------------------------
 
 def get_all_location_owners() -> List[Owner]:
-    # TODO: implement
+    # join to get cities for apartments
+    conn = None
+    try:
+        conn = Connector.DBConnector()
+        make_owner_city_apartments()
+        query=("SELECT Owner_ID,Name FROM Owner_city_apartments GROUP BY name"
+              "HAVING COUNT(DISTINCT City) = (SELECT COUNT(DISTINCT City) FROM Owner_city_apartments);")
+        return conn.execute(query)
+    except DatabaseException.ConnectionInvalid as e:
+        # do stuff
+        print(e)
+    except DatabaseException.NOT_NULL_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.CHECK_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.UNIQUE_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
+        # do stuff
+        print(e)
+    except Exception as e:
+        print(e)
+    finally:
+        # will happen any way after code try termination or exception handling
+        conn.close()
     pass
 
 
@@ -567,5 +632,33 @@ def profit_per_month(year: int) -> List[Tuple[int, float]]:
 
 
 def get_apartment_recommendation(customer_id: int) -> List[Tuple[Apartment, float]]:
-    # TODO: implement
+    conn = None
+    try:
+        conn = Connector.DBConnector()
+        #make ratio
+        make_customer_ratio(customer_id)
+        #get approximation
+        query =(" "
+                )
+        return conn.execute(query)
+    except DatabaseException.ConnectionInvalid as e:
+        # do stuff
+        print(e)
+    except DatabaseException.NOT_NULL_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.CHECK_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.UNIQUE_VIOLATION as e:
+        # do stuff
+        print(e)
+    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
+        # do stuff
+        print(e)
+    except Exception as e:
+        print(e)
+    finally:
+        # will happen any way after code try termination or exception handling
+        conn.close()
     pass
