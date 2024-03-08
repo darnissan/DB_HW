@@ -46,10 +46,10 @@ def make_view(viewName,attributes):
     conn = None
     try:
         conn = Connector.DBConnector()
-        query="CREATE VIEW "+viewName+" as\n"
-        for att in attributes:
-            query=query+att+",\n"
-        query +=";"
+        query = "CREATE VIEW " + viewName + " AS\n"
+        # Directly concatenate the parts of the SQL query
+        query += " ".join(attributes)
+        query += ";"
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         print(e)
@@ -188,9 +188,9 @@ def drop_tables():
 #temp func to make review_owner tab
 def make_owner_reviews():
     attributes = []
-    attributes.append("SELECT Apartment_ID,Owner_ID,rating ")
+    attributes.append("SELECT Owner_Apartments.Apartment_ID, Owner_ID, rating ")
     attributes.append("FROM Owner_Apartments LEFT OUTER JOIN Apartment_Reviews ")
-    attributes.append("ON Owner_Apartments.Apartment_ID=Apartment_Reviews.Apartment_ID")
+    attributes.append("ON Owner_Apartments.Apartment_ID = Apartment_Reviews.apartment_id")
     make_view("Owner_reviews", attributes)
 
 def make_owner_city_apartments():
@@ -491,6 +491,7 @@ def customer_cancelled_reservation(
     customer_id: int, apartment_id: int, start_date: date
 ) -> ReturnValue:
     conn = None
+    rows_affected = 0
     result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
@@ -499,7 +500,7 @@ def customer_cancelled_reservation(
         ).format(
             sql.Literal(customer_id), sql.Literal(apartment_id), sql.Literal(start_date)
         )
-        rows_affected = conn.execute(query)
+        rows_affected,_ = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
@@ -514,7 +515,8 @@ def customer_cancelled_reservation(
         result = ReturnValue.ERROR
     finally:
         if rows_affected == 0:
-            result =  ReturnValue.NOT_EXISTS
+            if result == ReturnValue.OK:
+                result =  ReturnValue.NOT_EXISTS
         conn.close()
         return  result
     pass
@@ -619,7 +621,7 @@ def owner_owns_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
-            "INSERT INTO Owner_Apartment(owner_id,apartment_id) VALUES({0},{1})"
+            "INSERT INTO Owner_Apartments(owner_id,apartment_id) VALUES({0},{1})"
         ).format(sql.Literal(owner_id), sql.Literal(apartment_id))
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
@@ -709,32 +711,38 @@ def get_owner_apartments(owner_id: int) -> List[Apartment]:
 
 def get_apartment_rating(apartment_id: int) -> float:
     conn = None
+    avg_rating =0
+    res=None
     try:
         make_owner_reviews()
         conn = Connector.DBConnector()
-        query="(SELECT AVG(Rating) from Owner_Reviews WHERE Apartment_ID=apartment_id)"
-        res=conn.execute(query)
-        return res
+        query = "(SELECT AVG(Rating) FROM Owner_Reviews WHERE Apartment_ID={0})".format(apartment_id)
+        _, res = conn.execute(query)
+        # Access the first item in the result set which is the tuple containing the Decimal
+        avg_rating_decimal = res.rows[0][0]  # This will be a Decimal object
+
+        # Convert Decimal to a float or int (depending on what you need)
+        avg_rating = int(avg_rating_decimal)  # For a floating-point number
+        # avg_rating = int(avg_rating_decimal)  # If you prefer an integer and the precision allows for it
+
+        # Now avg_rating contains the average rating as a float or an integer
+
     except DatabaseException.ConnectionInvalid as e:
-        # do stuff
-        print(e)
+        res= ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        # do stuff
-        print(e)
+       res = ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        # do stuff
-        print(e)
+        return ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        # do stuff
-        print(e)
+        return ReturnValue.ALREADY_EXISTS
     except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        # do stuff
-        print(e)
+        res = ReturnValue.NOT_EXISTS
     except Exception as e:
-        print(e)
+        res= ReturnValue.ERROR
     finally:
         # will happen any way after code try termination or exception handling
         conn.close()
+        return avg_rating
     pass
 
 
