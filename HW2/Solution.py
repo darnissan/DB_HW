@@ -13,7 +13,8 @@ from Business.Apartment import Apartment
 
 # ---------------------------------- CRUD API: ----------------------------------
 Table_Names=["Owner","Apartment","Customer"]
-Views=[]
+Views=["Owner_reviews","Owner_city_apartments","Customer_apartments","Cust1_apartments"
+       ,"Apartment_ratios","Apartment_approximations"]
 
 
 def make_table(tableName,attributes):
@@ -24,7 +25,6 @@ def make_table(tableName,attributes):
         for i in range(len(attributes)-1):
             query=query+attributes[i]+",\n"
         query = query + attributes[len(attributes)-1] +");"
-        conn = Connector.DBConnector()
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         print(e)
@@ -50,7 +50,6 @@ def make_view(viewName,attributes):
         for att in attributes:
             query=query+att+",\n"
         query +=";"
-        conn = Connector.DBConnector()
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         print(e)
@@ -200,7 +199,7 @@ def make_owner_city_apartments():
 
 def make_customer_apartments():
     attributes = []
-    attributes.append("SELECT customer_id,apartment_id")
+    attributes.append("SELECT customer_id,COUNT(apartment_id) AS customer_count")
     attributes.append("FROM Reservations GROUP BY customer_id")
     make_view("Customer_apartments", attributes)
 
@@ -550,10 +549,9 @@ def get_top_customer() -> Customer:
     try:
         conn = Connector.DBConnector()
         make_customer_apartments()
-        sub_query1="(SELECT customer_id,COUNT(apartment_id) AS customer_count FROM Customer_apartments)"
-        sub_query2="(SELECT customer_id,MAX(customer_count) FROM "+sub_query1+")"
-        sub_query3 = "(SELECT customer_id FROM" + sub_query2 + " LIMIT 1)"
-        res = conn.execute("SELECT * FROM Customer WHERE "+sub_query3+"=customer_id")
+        sub_query="(SELECT customer_id,MAX(customer_count) FROM Customer_apartments)"
+        sub_query2 = "(SELECT customer_id FROM" + sub_query + " LIMIT 1)"
+        res = conn.execute("SELECT * FROM Customer WHERE "+sub_query2+"=customer_id")
         return res
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
