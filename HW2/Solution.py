@@ -70,49 +70,49 @@ def make_view(viewName,attributes):
 
 def create_tables():
     attributes = []
-    attributes.append("Owner_ID INTEGER UNIQUE CHECK (Owner_ID>0)")
+    attributes.append("Owner_ID INTEGER NOT NULL UNIQUE CHECK (Owner_ID>0)")
     attributes.append("Owner_Name TEXT NOT NULL")
     make_table("Owner", attributes)
 
     # Apt
     attributes = []
-    attributes.append("Apartment_ID INTEGER UNIQUE CHECK (Apartment_ID>0)")
+    attributes.append("Apartment_ID INTEGER NOT NULL UNIQUE CHECK (Apartment_ID>0)")
     attributes.append("Address TEXT NOT NULL")
     attributes.append("City TEXT NOT NULL")
     attributes.append("Country TEXT NOT NULL")
-    attributes.append("Size INTEGER CHECK (Size>0)")
+    attributes.append("Size INTEGER NOT NULL CHECK (Size>0)")
     attributes.append("CONSTRAINT UC_Apartment UNIQUE (Address,City,Country)")
     make_table("Apartment", attributes)
 
     attributes = []
-    attributes.append("Customer_ID INTEGER UNIQUE CHECK (Customer_ID>0)")
+    attributes.append("Customer_ID INTEGER NOT NULL UNIQUE CHECK (Customer_ID>0)")
     attributes.append("Customer_name TEXT NOT NULL")
     make_table("Customer", attributes)
 
     # reservations
     attributes = []
-    attributes.append("customer_id INTEGER CHECK (customer_id>0)")
-    attributes.append("apartment_id INTEGER UNIQUE CHECK (apartment_id>0)")
-    attributes.append("start_date DATE")
-    attributes.append("end_date DATE")
-    attributes.append("total_price INTEGER CHECK (total_price>0)")
+    attributes.append("customer_id INTEGER NOT NULL CHECK (customer_id>0)")
+    attributes.append("apartment_id INTEGER NOT NULL UNIQUE CHECK (apartment_id>0)")
+    attributes.append("start_date DATE NOT NULL")
+    attributes.append("end_date DATE NOT NULL")
+    attributes.append("total_price INTEGER NOT NULL CHECK (total_price>0)")
     attributes.append("CONSTRAINT UC_Apartment_reservations UNIQUE (customer_id,apartment_id)")
     make_table("Reservations", attributes)
 
     # reviews
     attributes = []
-    attributes.append("customer_id INTEGER CHECK (customer_id>0)")
-    attributes.append("apartment_id INTEGER UNIQUE CHECK (apartment_id>0)")
+    attributes.append("customer_id INTEGER NOT NULL CHECK (customer_id>0)")
+    attributes.append("apartment_id INTEGER NOT NULL UNIQUE CHECK (apartment_id>0)")
     attributes.append("review_date DATE")
-    attributes.append("rating INTEGER CHECK (rating>0 AND rating<11)")
-    attributes.append("review_text TEXT")
+    attributes.append("rating INTEGER NOT NULL CHECK (rating>0 AND rating<11)")
+    attributes.append("review_text TEXT NOT NULL")
     attributes.append("CONSTRAINT UC_Resrvations UNIQUE (customer_id,apartment_id)")
     make_table("Apartment_Reviews", attributes)
 
     # owner and his apartments
     attributes = []
-    attributes.append("owner_id INTEGER CHECK (owner_id>0)")
-    attributes.append("apartment_id INTEGER UNIQUE CHECK (apartment_id>0)")
+    attributes.append("owner_id INTEGER NOT NULL CHECK (owner_id>0)")
+    attributes.append("apartment_id INTEGER NOT NULL UNIQUE CHECK (apartment_id>0)")
     attributes.append("CONSTRAINT UC_Owner_Apts UNIQUE (owner_id,apartment_id)")
     make_table("Owner_Apartments", attributes)
 
@@ -234,6 +234,7 @@ def make_customer_ratio(customer_ID):
 
 def add_owner(owner: Owner) -> ReturnValue:
     conn = None
+    result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("INSERT INTO Owner(Owner_ID,Owner_Name) VALUES({id},{Ownername})").format(
@@ -242,18 +243,18 @@ def add_owner(owner: Owner) -> ReturnValue:
         )
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
-        print(e)
+        result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result= ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        return ReturnValue.ERROR
+        result=ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        return ReturnValue.ALREADY_EXISTS
+        result= ReturnValue.ALREADY_EXISTS
     except Exception as e:
-        print(e)
+        result = ReturnValue.ERROR
     finally:
         conn.close()
-        return ReturnValue.OK
+        return result
 
 
 def get_owner(owner_id: int) -> Owner:
@@ -288,35 +289,37 @@ def delete_owner(owner_id: int) -> ReturnValue:
     pass
 
 
+
 def add_apartment(apartment: Apartment) -> ReturnValue:
     # TODO: implement
     conn = None
+    result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
-            "INSERT INTO Apartments(id,owner_id,adress,city,country,size) VALUES({id},{owner_id},{adress},{city},{country},{size})"
+            "INSERT INTO Apartment(Apartment_ID,Address, City,Country,Size) VALUES({id},{address},{city},{country},{size})"
         ).format(
             id=sql.Literal(apartment.get_id()),
-            owner_id=sql.Literal(apartment.get_owner_id()),
-            adress=sql.Literal(apartment.get_adress()),
+            address=sql.Literal(apartment.get_address()),
             city=sql.Literal(apartment.get_city()),
             country=sql.Literal(apartment.get_country()),
             size=sql.Literal(apartment.get_size()),
         )
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        return ReturnValue.ALREADY_EXISTS
+        result = ReturnValue.ALREADY_EXISTS
     except Exception as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     finally:
         conn.close()
-        return ReturnValue.OK
+        return result
+
 
 
 def get_apartment(apartment_id: int) -> Apartment:
@@ -325,7 +328,7 @@ def get_apartment(apartment_id: int) -> Apartment:
     result = 0
     try:
         conn = Connector.DBConnector()
-        result = conn.execute("SELECT * FROM Apartments WHERE id=?", (apartment_id))
+        result = conn.execute("SELECT * FROM Apartment WHERE id=?", (apartment_id))
     except DatabaseException:
         return Apartment.bad_apartment()
     finally:
@@ -335,6 +338,7 @@ def get_apartment(apartment_id: int) -> Apartment:
 
 def delete_apartment(apartment_id: int) -> ReturnValue:
     conn = None
+    result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("DELETE FROM Apartments WHERE id={0}").format(
@@ -342,14 +346,14 @@ def delete_apartment(apartment_id: int) -> ReturnValue:
         )
         conn.execute(query)
     except DatabaseException.UNIQUE_VIOLATION:
-        return ReturnValue.NOT_EXISTS
+        result = ReturnValue.NOT_EXISTS
     except DatabaseException.CHECK_VIOLATION:
-        return ReturnValue.BAD_PARAMS
+        result =ReturnValue.BAD_PARAMS
     except DatabaseException:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     finally:
         conn.close()
-        return ReturnValue.OK
+        return result
 
 
 def add_customer(customer: Customer) -> ReturnValue:
@@ -369,7 +373,7 @@ def add_customer(customer: Customer) -> ReturnValue:
     except DatabaseException.NOT_NULL_VIOLATION as e:
         result= ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        result=  ReturnValue.ERROR
+        result=  ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
         result= ReturnValue.ALREADY_EXISTS
     except Exception as e:
@@ -437,8 +441,9 @@ def customer_made_reservation(
     total_price: float,
 ) -> ReturnValue:
     conn = None
+    result = ReturnValue.OK
     if total_price < 0 or start_date > end_date:
-        return ReturnValue.BAD_PARAMS
+        result =  ReturnValue.BAD_PARAMS
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
@@ -452,29 +457,30 @@ def customer_made_reservation(
         )
         rows_affected = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
-        return ReturnValue.ERROR
+        result =  ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result =  ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result =  ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result =  ReturnValue.BAD_PARAMS
     except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        return ReturnValue.NOT_EXISTS
+        result =  ReturnValue.NOT_EXISTS
     except Exception as e:
-        return ReturnValue.ERROR
+        result =  ReturnValue.ERROR
     finally:
         # check if the apartment is available
         if rows_affected == 0:
-            return ReturnValue.BAD_PARAMS
+            result =  ReturnValue.BAD_PARAMS
         conn.close()
-        return ReturnValue.OK
+        return result
 
 
 def customer_cancelled_reservation(
     customer_id: int, apartment_id: int, start_date: date
 ) -> ReturnValue:
     conn = None
+    result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
@@ -484,22 +490,22 @@ def customer_cancelled_reservation(
         )
         rows_affected = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result =  ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result =  ReturnValue.BAD_PARAMS
     except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        return ReturnValue.NOT_EXISTS
+        result = ReturnValue.NOT_EXISTS
     except Exception as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     finally:
         if rows_affected == 0:
-            return ReturnValue.NOT_EXISTS
+            result =  ReturnValue.NOT_EXISTS
         conn.close()
-        return ReturnValue.OK
+        return  result
     pass
 
 
@@ -511,8 +517,9 @@ def customer_reviewed_apartment(
     review_text: str,
 ) -> ReturnValue:
     conn = None
+    result = ReturnValue.OK
     if rating < 0 or rating > 10:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
@@ -526,35 +533,36 @@ def customer_reviewed_apartment(
         )
         rows_affected = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        return ReturnValue.NOT_EXISTS
+        result = ReturnValue.NOT_EXISTS
     except Exception as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     finally:
         if rows_affected == 0:
-            return ReturnValue.NOT_EXISTS
+            result = ReturnValue.NOT_EXISTS
         conn.close()
-        return ReturnValue.OK
+        return result
     pass
 
 
 def customer_updated_review(
     customer_id: int,
-    apartmetn_id: int,
+    apartment_id: int,
     update_date: date,
     new_rating: int,
     new_text: str,
 ) -> ReturnValue:
     conn = None
+    result = ReturnValue.OK
     if new_rating < 0 or new_rating > 10:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
@@ -563,32 +571,33 @@ def customer_updated_review(
             sql.Literal(new_rating),
             sql.Literal(new_text),
             sql.Literal(customer_id),
-            sql.Literal(apartmetn_id),
+            sql.Literal(apartment_id),
             sql.Literal(update_date),
         )
         rows_affected = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        return ReturnValue.NOT_EXISTS
+        result = ReturnValue.NOT_EXISTS
     except Exception as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     finally:
         if rows_affected == 0:
-            return ReturnValue.NOT_EXISTS
+            result = ReturnValue.NOT_EXISTS
         conn.close()
-        return ReturnValue.OK
+        return result
     pass
 
 
 def owner_owns_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
     conn = None
+    result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
@@ -596,25 +605,26 @@ def owner_owns_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
         ).format(sql.Literal(owner_id), sql.Literal(apartment_id))
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result =ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result =ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        return ReturnValue.ALREADY_EXISTS
+        result =ReturnValue.ALREADY_EXISTS
     except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        return ReturnValue.NOT_EXISTS
+        result =ReturnValue.NOT_EXISTS
     except Exception as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     finally:
         conn.close()
-        return ReturnValue.OK
+        return result
     pass
 
 
 def owner_drops_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
     conn = None
+    result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
@@ -622,22 +632,22 @@ def owner_drops_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
         ).format(sql.Literal(owner_id), sql.Literal(apartment_id))
         rows_affected = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
-        return ReturnValue.ERROR
+        result =  ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result =  ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result =  ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result = ReturnValue.BAD_PARAMS
     except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        return ReturnValue.NOT_EXISTS
+        result =  ReturnValue.NOT_EXISTS
     except Exception as e:
-        return ReturnValue.ERROR
+        result = ReturnValue.ERROR
     finally:
         if rows_affected == 0:
-            return ReturnValue.NOT_EXISTS
+            result =  ReturnValue.NOT_EXISTS
         conn.close()
-        return ReturnValue.OK
+        return result
     pass
 
 
