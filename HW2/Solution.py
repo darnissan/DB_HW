@@ -126,7 +126,7 @@ def clear_tables():
         for tab in Table_Names:
             conn.execute("DELETE FROM "+tab+";")
         for view in Views:
-            conn.execute("DELETE FROM " + view + ";")
+            conn.execute("DELETE FROM IF EXISTS " + view + ";")
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -157,7 +157,7 @@ def drop_tables():
         for tab in Table_Names:
             conn.execute("DROP TABLE " + tab + ";")
         for view in Views:
-            conn.execute("DROP VIEW " + view + ";")
+            conn.execute("DROP VIEW IF EXISTS " + view + ";")
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -235,8 +235,10 @@ def add_owner(owner: Owner) -> ReturnValue:
     conn = None
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("INSERT INTO Owners(id,name) VALUES({id},{owenrname})").format(
-            id=sql.Literal(owner.get_owner_id()), owenrname=sql.Literal(owner.get_owner_name()))
+        query = sql.SQL("INSERT INTO Owner(Owner_ID,Owner_Name) VALUES({id},{Ownername})").format(
+            id=sql.Literal(owner.get_owner_id()),
+            Ownername=sql.Literal(owner.get_owner_name()),
+        )
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         print(e)
@@ -251,6 +253,7 @@ def add_owner(owner: Owner) -> ReturnValue:
     finally:
         conn.close()
         return ReturnValue.OK
+
 
 
 def get_owner(owner_id: int) -> Owner:
@@ -344,24 +347,29 @@ def delete_apartment(apartment_id: int) -> ReturnValue:
 
 def add_customer(customer: Customer) -> ReturnValue:
     conn = None
+    result= ReturnValue.OK
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("INSERT INTO Customers(id,name) VALUES({id},{customername})").format(
-            id=sql.Literal(customer.get_customer_id()), customername=sql.Literal(customer.get_customer_name()))
+        query = sql.SQL(
+            "INSERT INTO Customer(Customer_ID,Customer_Name) VALUES({id},{customername})"
+        ).format(
+            id=sql.Literal(customer.get_customer_id()),
+            customername=sql.Literal(customer.get_customer_name()),
+        )
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
-        print(e)
+        result=ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
-        return ReturnValue.BAD_PARAMS
+        result= ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION as e:
-        return ReturnValue.ERROR
+        result=  ReturnValue.ERROR
     except DatabaseException.UNIQUE_VIOLATION as e:
-        return ReturnValue.ALREADY_EXISTS
+        result= ReturnValue.ALREADY_EXISTS
     except Exception as e:
-        print(e)
+        result= ReturnValue.ERROR
     finally:
         conn.close()
-        return ReturnValue.OK
+        return result
 
 
 def get_customer(customer_id: int) -> Customer:
