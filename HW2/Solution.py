@@ -12,7 +12,7 @@ from Business.Apartment import Apartment
 
 
 # ---------------------------------- CRUD API: ----------------------------------
-Table_Names=["Owner","Apartment","Customer","Reservations","Apartment_Reviews","Owner_Apartments"]
+Table_Names=["Reservations","Owner","Apartment","Customer","Apartment_Reviews","Owner_Apartments"]
 Views=["Owner_reviews","Owner_city_apartments","Customer_apartments","Cust1_apartments"
        ,"Apartment_ratios","Apartment_approximations"]
 
@@ -91,8 +91,10 @@ def create_tables():
 
     # reservations
     attributes = []
-    attributes.append("customer_id INTEGER NOT NULL CHECK (customer_id>0)")
+    attributes.append("customer_id INTEGER NOT NULL UNIQUE CHECK (customer_id>0)")
+    attributes.append("FOREIGN KEY (customer_id) REFERENCES Customer(Customer_ID)")
     attributes.append("apartment_id INTEGER NOT NULL UNIQUE CHECK (apartment_id>0)")
+    attributes.append("FOREIGN KEY (apartment_id ) REFERENCES Apartment(Apartment_ID)")
     attributes.append("start_date DATE NOT NULL")
     attributes.append("end_date DATE NOT NULL")
     attributes.append("total_price INTEGER NOT NULL CHECK (total_price>0)")
@@ -106,7 +108,7 @@ def create_tables():
     attributes.append("review_date DATE")
     attributes.append("rating INTEGER NOT NULL CHECK (rating>0 AND rating<11)")
     attributes.append("review_text TEXT NOT NULL")
-    attributes.append("CONSTRAINT UC_Resrvations UNIQUE (customer_id,apartment_id)")
+    attributes.append("CONSTRAINT UC_Reservations UNIQUE (customer_id,apartment_id)")
     make_table("Apartment_Reviews", attributes)
 
     # owner and his apartments
@@ -441,6 +443,7 @@ def customer_made_reservation(
     total_price: float,
 ) -> ReturnValue:
     conn = None
+    rows_affected=0
     result = ReturnValue.OK
     if total_price < 0 or start_date > end_date:
         result =  ReturnValue.BAD_PARAMS
@@ -471,7 +474,8 @@ def customer_made_reservation(
     finally:
         # check if the apartment is available
         if rows_affected == 0:
-            result =  ReturnValue.BAD_PARAMS
+            if result == ReturnValue.OK:
+                result =  ReturnValue.BAD_PARAMS
         conn.close()
         return result
 
@@ -480,6 +484,7 @@ def customer_cancelled_reservation(
     customer_id: int, apartment_id: int, start_date: date
 ) -> ReturnValue:
     conn = None
+    rows_affected = 0
     result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
@@ -503,7 +508,8 @@ def customer_cancelled_reservation(
         result = ReturnValue.ERROR
     finally:
         if rows_affected == 0:
-            result =  ReturnValue.NOT_EXISTS
+            if result == ReturnValue.OK:
+                result =  ReturnValue.NOT_EXISTS
         conn.close()
         return  result
     pass
@@ -517,6 +523,7 @@ def customer_reviewed_apartment(
     review_text: str,
 ) -> ReturnValue:
     conn = None
+    rows_affected = 0
     result = ReturnValue.OK
     if rating < 0 or rating > 10:
         result = ReturnValue.BAD_PARAMS
@@ -546,7 +553,8 @@ def customer_reviewed_apartment(
         result = ReturnValue.ERROR
     finally:
         if rows_affected == 0:
-            result = ReturnValue.NOT_EXISTS
+            if result == ReturnValue.OK:
+                result = ReturnValue.NOT_EXISTS
         conn.close()
         return result
     pass
@@ -560,6 +568,7 @@ def customer_updated_review(
     new_text: str,
 ) -> ReturnValue:
     conn = None
+    rows_affected = 0
     result = ReturnValue.OK
     if new_rating < 0 or new_rating > 10:
         result = ReturnValue.BAD_PARAMS
@@ -589,7 +598,8 @@ def customer_updated_review(
         result = ReturnValue.ERROR
     finally:
         if rows_affected == 0:
-            result = ReturnValue.NOT_EXISTS
+            if result == ReturnValue.OK:
+                result = ReturnValue.NOT_EXISTS
         conn.close()
         return result
     pass
@@ -624,6 +634,7 @@ def owner_owns_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
 
 def owner_drops_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
     conn = None
+    rows_affected = 0
     result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
@@ -645,7 +656,8 @@ def owner_drops_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
         result = ReturnValue.ERROR
     finally:
         if rows_affected == 0:
-            result =  ReturnValue.NOT_EXISTS
+                if result == ReturnValue.OK:
+                    result = ReturnValue.NOT_EXISTS
         conn.close()
         return result
     pass
