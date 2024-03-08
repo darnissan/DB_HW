@@ -12,7 +12,7 @@ from Business.Apartment import Apartment
 
 
 # ---------------------------------- CRUD API: ----------------------------------
-Table_Names=["Owner","Apartment","Customer"]
+Table_Names=["Owner","Apartment","Customer","Reservations","Apartment_Reviews","Owner_Apartments"]
 Views=["Owner_reviews","Owner_city_apartments","Customer_apartments","Cust1_apartments"
        ,"Apartment_ratios","Apartment_approximations"]
 
