@@ -13,6 +13,7 @@ from Business.Apartment import Apartment
 
 # ---------------------------------- CRUD API: ----------------------------------
 Table_Names=["Owner","Apartment","Customer"]
+Views=[]
 
 
 def make_table(tableName,attributes):
@@ -20,9 +21,9 @@ def make_table(tableName,attributes):
     try:
         conn = Connector.DBConnector()
         query="CREATE TABLE "+tableName+"\n("
-        for i in range(attributes.len-1):
+        for i in range(len(attributes)-1):
             query=query+attributes[i]+",\n"
-        query = query + attributes[attributes.len-1] +");"
+        query = query + attributes[len(attributes)-1] +");"
         conn = Connector.DBConnector()
         conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
@@ -69,32 +70,34 @@ def make_view(viewName,attributes):
     pass
 
 def create_tables():
-    attributes=[]
-    attributes.append("Owner ID INTEGER UNIQUE CHECK (Owner ID>0)")
-    attributes.append("Name STRING NOT NULL")
-    make_table("Owner",attributes)
-
     attributes = []
-    attributes.append("Apartment ID INTEGER UNIQUE CHECK (Apartment ID>0)")
-    attributes.append("Address STRING NOT NULL")
-    attributes.append("City STRING NOT NULL")
-    attributes.append("Country STRING NOT NULL")
+    attributes.append("Owner_ID INTEGER UNIQUE CHECK (Owner_ID>0)")
+    attributes.append("Owner_Name TEXT NOT NULL")
+    make_table("Owner", attributes)
+
+    # Apt
+    attributes = []
+    attributes.append("Apartment_ID INTEGER UNIQUE CHECK (Apartment_ID>0)")
+    attributes.append("Address TEXT NOT NULL")
+    attributes.append("City TEXT NOT NULL")
+    attributes.append("Country TEXT NOT NULL")
     attributes.append("Size INTEGER CHECK (Size>0)")
     attributes.append("CONSTRAINT UC_Apartment UNIQUE (Address,City,Country)")
     make_table("Apartment", attributes)
 
     attributes = []
-    attributes.append("Customer ID INTEGER UNIQUE CHECK (Customer ID>0)")
-    attributes.append("Customer name STRING NOT NULL")
+    attributes.append("Customer_ID INTEGER UNIQUE CHECK (Customer_ID>0)")
+    attributes.append("Customer_name TEXT NOT NULL")
     make_table("Customer", attributes)
 
-    #reservations
+    # reservations
+    attributes = []
     attributes.append("customer_id INTEGER CHECK (customer_id>0)")
     attributes.append("apartment_id INTEGER UNIQUE CHECK (apartment_id>0)")
     attributes.append("start_date DATE")
     attributes.append("end_date DATE")
     attributes.append("total_price INTEGER CHECK (total_price>0)")
-    attributes.append("CONSTRAINT UC_Apartment UNIQUE (customer_id,apartment_id)")
+    attributes.append("CONSTRAINT UC_Apartment_reservations UNIQUE (customer_id,apartment_id)")
     make_table("Reservations", attributes)
 
     # reviews
@@ -123,6 +126,8 @@ def clear_tables():
         conn = Connector.DBConnector()
         for tab in Table_Names:
             conn.execute("DELETE FROM "+tab+";")
+        for view in Views:
+            conn.execute("DELETE FROM " + view + ";")
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -152,7 +157,8 @@ def drop_tables():
         conn = Connector.DBConnector()
         for tab in Table_Names:
             conn.execute("DROP TABLE " + tab + ";")
-        conn.execute("DROP VIEW Owner_reviews;")
+        for view in Views:
+            conn.execute("DROP VIEW " + view + ";")
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -196,29 +202,35 @@ def make_customer_apartments():
     attributes = []
     attributes.append("SELECT customer_id,apartment_id")
     attributes.append("FROM Reservations GROUP BY customer_id")
-    attributes.append("ON Owner_Apartments.Apartment_ID=Apartment_Reviews.Apartment_ID")
     make_view("Customer_apartments", attributes)
 
 
 def make_customer_ratio(customer_ID):
     attributes = []
-    make_customer_apartments()
-
-    #need to drop them immediately????
-
-    attributes.append("SELECT apartment_id")
-    attributes.append("FROM Customer_apartments")
-    attributes.append("WHERE Customer_apartments.customer_id=customer_id")
+    #get apartments for our
+    attributes.append("SELECT apartment_id,rating")
+    attributes.append("FROM Apartment_Reviews")
+    attributes.append("WHERE Apartment_Reviews.customer_id=customer_ID")
     make_view("Cust1_apartments", attributes)
 
+
+
+    #get ratios
     attributes = []
-    attributes.append("SELECT customer_id,apartment_id,rating ")
-    attributes.append("FROM Apartment_Reviews GROUP BY apartment_id ")
+    attributes.append("SELECT customer_id,AVG(Cust1_apartments.rating/Apartment_Reviews.rating) AS ratio ")
+    attributes.append("FROM Apartment_Reviews GROUP BY customer_id")
     attributes.append("INNER JOIN Cust1_apartments ")
-    attributes.append("ON Cust1_apartments.Apartment_ID=Apartment_Reviews.Apartment_ID ")
-    attributes.append("AND Cust1_apartments.Customer_ID=Apartment_Reviews.Customer_ID ")
-    attributes.append("AND Cust1_apartments.Customer_ID!=customer_ID")
-    make_view("Customer_ratios", attributes)
+    attributes.append("ON Cust1_apartments.apartment_id=Apartment_Reviews.apartment_id_ID ")
+    attributes.append("AND Apartment_Reviews.customer_id !=customer_ID")
+    make_view("Apartment_ratios", attributes)
+
+    # get approximations
+    attributes = []
+    attributes.append("SELECT apartment_id,GREATEST(1,LEAST(10,AVG(ratio * Apartment_Reviews.rating))) ")
+    attributes.append("FROM Apartment_Reviews GROUP BY apartment_id")
+    attributes.append("INNER JOIN Apartment_ratios ")
+    attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id")
+    make_view("Apartment_approximations", attributes)
 
 def add_owner(owner: Owner) -> ReturnValue:
     conn = None
@@ -645,8 +657,9 @@ def get_apartment_recommendation(customer_id: int) -> List[Tuple[Apartment, floa
         #make ratio
         make_customer_ratio(customer_id)
         #get approximation
-        query =(" "
-                )
+        query =("SELECT * "
+                "FROM Apartment INNER JOIN Apartment_approximations"
+                "ON Apartment.apartment_id=Apartment_approximations.apartment_id")
         return conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
