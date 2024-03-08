@@ -103,12 +103,14 @@ def create_tables():
 
     # reviews
     attributes = []
-    attributes.append("customer_id INTEGER NOT NULL CHECK (customer_id>0)")
-    attributes.append("apartment_id INTEGER NOT NULL UNIQUE CHECK (apartment_id>0)")
-    attributes.append("review_date DATE")
-    attributes.append("rating INTEGER NOT NULL CHECK (rating>0 AND rating<11)")
+    attributes.append("customer_id INTEGER NOT NULL REFERENCES Customer(customer_id) ")
+    attributes.append("apartment_id INTEGER NOT NULL REFERENCES Apartment(apartment_id) ")
+    attributes.append("review_date DATE NOT NULL")
+    attributes.append("rating INTEGER NOT NULL CHECK (rating > 0 AND rating <= 10)")
     attributes.append("review_text TEXT NOT NULL")
-    attributes.append("CONSTRAINT UC_Resrvations UNIQUE (customer_id,apartment_id)")
+    # Adjust the UNIQUE constraint according to your business rules
+    # If allowing multiple reviews by the same customer for the same apartment, consider removing this or adjusting.
+    attributes.append("CONSTRAINT UC_Reviews UNIQUE (customer_id, apartment_id)")
     make_table("Apartment_Reviews", attributes)
 
     # owner and his apartments
@@ -531,16 +533,24 @@ def customer_reviewed_apartment(
         result = ReturnValue.BAD_PARAMS
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL(
-            "INSERT INTO Apartment_Reviews(customer_id,apartment_id,review_date,rating,review_text) VALUES({customer_id},{apartment_id},{review_date},{rating},{review_text})"
-        ).format(
+        query = sql.SQL("""
+            INSERT INTO Apartment_Reviews(customer_id, apartment_id, review_date, rating, review_text)
+            SELECT {customer_id}, {apartment_id}, {review_date}, {rating}, {review_text}
+            WHERE EXISTS (
+                SELECT 1 FROM Reservations
+                WHERE customer_id = {customer_id} AND apartment_id = {apartment_id}
+                AND end_date < {review_date}
+            ); 
+           """).format(
             customer_id=sql.Literal(customer_id),
             apartment_id=sql.Literal(apartment_id),
             review_date=sql.Literal(review_date),
             rating=sql.Literal(rating),
             review_text=sql.Literal(review_text),
         )
-        rows_affected = conn.execute(query)
+        rows_affected,_ = conn.execute(query)
+        if rows_affected == 0:
+            result = ReturnValue.NOT_EXISTS
     except DatabaseException.ConnectionInvalid as e:
         result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
@@ -548,14 +558,13 @@ def customer_reviewed_apartment(
     except DatabaseException.CHECK_VIOLATION as e:
         result = ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION as e:
-        result = ReturnValue.BAD_PARAMS
+        result = ReturnValue.ALREADY_EXISTS
     except DatabaseException.FOREIGN_KEY_VIOLATION as e:
         result = ReturnValue.NOT_EXISTS
     except Exception as e:
         result = ReturnValue.ERROR
     finally:
-        if rows_affected == 0:
-            result = ReturnValue.NOT_EXISTS
+
         conn.close()
         return result
     pass
