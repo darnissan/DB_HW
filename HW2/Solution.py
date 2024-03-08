@@ -126,7 +126,8 @@ def clear_tables():
         for tab in Table_Names:
             conn.execute("DELETE FROM "+tab+";")
         for view in Views:
-            conn.execute("DELETE FROM IF EXISTS " + view + ";")
+            if (conn.execute("SELECT * FROM pg_views WHERE viewname = '"+view+"';")[0]):
+                conn.execute("DELETE FROM "+view+";")
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -194,7 +195,7 @@ def make_owner_city_apartments():
     attributes.append("FROM Owner_Apartments INNER JOIN Apartment_Reviews ")
     attributes.append("ON Owner_Apartments.Owner_ID=Apartment_Reviews.Owner_ID ")
     attributes.append("AND Owner_Apartments.Apartment_ID=Apartment_Reviews.Apartment_ID ")
-    attributes.append("INNER JOIN Owner ON Owner_Apartments.Owner_ID= Owner.Owner_ID;)")
+    attributes.append("INNER JOIN Owner ON Owner_Apartments.Owner_ID= Owner.Owner_ID")
     make_view("Owner_city_apartments", attributes)
 
 def make_customer_apartments():
@@ -809,7 +810,7 @@ def get_all_location_owners() -> List[Owner]:
     try:
         conn = Connector.DBConnector()
         make_owner_city_apartments()
-        query=("SELECT Owner_ID,Name FROM Owner_city_apartments GROUP BY name"
+        query=("SELECT Owner_ID,Name FROM Owner_city_apartments GROUP BY name "
               "HAVING COUNT(DISTINCT City) = (SELECT COUNT(DISTINCT City) FROM Owner_city_apartments);")
         return conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
