@@ -11,8 +11,8 @@ from Business.Customer import Customer
 from Business.Apartment import Apartment
 
 # ---------------------------------- CRUD API: ----------------------------------
-Table_Names = ["Owner", "Apartment", "Customer", "Reservations", "Apartment_Reviews", "Owner_Apartments"]
-Views = ["Owner_reviews", "Owner_city_apartments", "Customer_apartments", "Cust1_apartments"
+Table_Names = ["Reservations", "Apartment_Reviews", "Owner_Apartments","Owner", "Apartment", "Customer"]
+Views = ["Owner_reviews", "Owner_city_apartments","Owner_Reservations", "Customer_apartments", "Cust1_apartments"
     , "Apartment_ratios", "Apartment_approximations"]
 
 
@@ -130,11 +130,15 @@ def clear_tables():
     conn = None
     try:
         conn = Connector.DBConnector()
+        """
+        for view in Views:
+            q="SELECT table_name FROM information_schema.views WHERE table_name = '" + view + "';"
+            qt=conn.execute(q)
+            if (conn.execute(q)[0]):
+                conn.execute("DELETE FROM " + view + ";")
+        """
         for tab in Table_Names:
             conn.execute("DELETE FROM " + tab + ";")
-        for view in Views:
-            if (conn.execute("SELECT * FROM pg_views WHERE viewname = '" + view + "';")[0]):
-                conn.execute("DELETE FROM " + view + ";")
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -162,10 +166,10 @@ def drop_tables():
     conn = None
     try:
         conn = Connector.DBConnector()
-        for tab in Table_Names:
-            conn.execute("DROP TABLE " + tab + " CASCADE ;")
         for view in Views:
             conn.execute("DROP VIEW IF EXISTS " + view + ";")
+        for tab in Table_Names:
+            conn.execute("DROP TABLE " + tab + " CASCADE ;")
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -234,7 +238,7 @@ def make_customer_ratio(customer_ID):
     attributes = []
     attributes.append("SELECT customer_id,AVG(Cust1_apartments.rating/Apartment_Reviews.rating) AS ratio ")
     attributes.append("FROM Apartment_Reviews GROUP BY customer_id")
-    attributes.append("INNER JOIN Cust1_apartments ")
+    attributes.append("JOIN Cust1_apartments ")
     attributes.append("ON Cust1_apartments.apartment_id=Apartment_Reviews.apartment_id_ID ")
     attributes.append("AND Apartment_Reviews.customer_id !=customer_ID")
     make_view("Apartment_ratios", attributes)
@@ -243,7 +247,7 @@ def make_customer_ratio(customer_ID):
     attributes = []
     attributes.append("SELECT apartment_id,GREATEST(1,LEAST(10,AVG(ratio * Apartment_Reviews.rating))) ")
     attributes.append("FROM Apartment_Reviews GROUP BY apartment_id")
-    attributes.append("INNER JOIN Apartment_ratios ")
+    attributes.append("JOIN Apartment_ratios ")
     attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id")
     make_view("Apartment_approximations", attributes)
 
@@ -1098,7 +1102,7 @@ def get_apartment_recommendation(customer_id: int) -> List[Tuple[Apartment, floa
         make_customer_ratio(customer_id)
         # get approximation
         query = ("SELECT * "
-                 "FROM Apartment INNER JOIN Apartment_approximations"
+                 "FROM Apartment INNER JOIN Apartment_approximations "
                  "ON Apartment.apartment_id=Apartment_approximations.apartment_id")
         return conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
