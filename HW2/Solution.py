@@ -266,8 +266,14 @@ def get_owner(owner_id: int) -> Owner:
     result = 0
     try:
         conn = Connector.DBConnector()
-        result = conn.execute("SELECT * FROM Owner WHERE id=?", (owner_id))
-    except DatabaseException:
+        query=sql.SQL("SELECT * FROM Owner WHERE owner_id={0}").format(sql.Literal(owner_id))
+        rows,owners = conn.execute(query)
+        if owners is not None and rows >0 :
+            result=Owner(owners[0]['Owner_ID'],owners[0]['Owner_Name'])
+        else :
+            result = Owner.bad_owner()
+    except Exception as e :
+        print (e)
         return Owner.bad_owner()
     finally:
         conn.close()
@@ -422,8 +428,14 @@ def get_customer(customer_id: int) -> Customer:
     result = 0
     try:
         conn = Connector.DBConnector()
-        result = conn.execute("SELECT * FROM Customer WHERE id=?", (customer_id))
-    except DatabaseException:
+        query=sql.SQL("SELECT * FROM Customer WHERE customer_id={0}").format(sql.Literal(customer_id))
+        rows_effected,customers = conn.execute(query)
+        if customers is not None and rows_effected > 0:
+            result = Customer(customers[0]['Customer_ID'],customers[0]['Customer_Name'])
+        else :
+            result=Customer.bad_customer()
+    except Exception as e:
+        print(e)
         return Customer.bad_customer()
     finally:
         conn.close()
@@ -693,7 +705,7 @@ def owner_drops_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
-            "DELETE FROM Owner_Apartment WHERE owner_id={0} AND apartment_id={1}"
+            "DELETE FROM Owner_Apartments WHERE owner_id={0} AND apartment_id={1}"
         ).format(sql.Literal(owner_id), sql.Literal(apartment_id))
         rows_affected = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
@@ -721,12 +733,17 @@ def get_apartment_owner(apartment_id: int) -> Owner:
     result = 0
     try:
         conn = Connector.DBConnector()
-        result = conn.execute(
-            "SELECT * FROM Owner WHERE id IN (SELECT owner_id FROM Owner_Apartment WHERE apartment_id={0})".format(
+        query=sql.SQL("SELECT * FROM Owner WHERE owner_id IN (SELECT owner_id FROM Owner_Apartments WHERE apartment_id={0})".format(
                 apartment_id
             )
         )
-    except DatabaseException:
+        rows_effected,owners = conn.execute(query)
+        if owners is not None and rows_effected >0 :
+            result = Owner(owners[0]['Owner_ID'],owners[0]['Owner_Name'])
+        else :
+            result = Owner.bad_owner()
+    except Exception as e:
+        print (e)
         return Owner.bad_owner()
     finally:
         conn.close()
@@ -736,15 +753,17 @@ def get_apartment_owner(apartment_id: int) -> Owner:
 
 def get_owner_apartments(owner_id: int) -> List[Apartment]:
     conn = None
-    result = 0
+    result = []
     try:
         conn = Connector.DBConnector()
-        result = conn.execute(
-            "SELECT * FROM Apartment WHERE id IN (SELECT apartment_id FROM Owner_Apartment WHERE owner_id={0})".format(
-                owner_id
-            )
-        )
-    except DatabaseException:
+        query=sql.SQL("SELECT * FROM Apartment WHERE apartment_id IN (SELECT apartment_id FROM Owner_Apartments WHERE owner_id={0})".format( owner_id))
+        rows,apartments  = conn.execute(query)
+        if (apartments is not None) and rows >0 :
+            for index in range(apartments.size()) :
+                current_row = apartments[index]
+                result.append(Apartment(current_row['Apartment_ID'],current_row['Address'],current_row['City'],current_row['Country'],current_row['Size']))
+    except Exception as e:
+        print (e)
         return []
     finally:
         conn.close()
