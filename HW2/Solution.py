@@ -1004,16 +1004,30 @@ def best_value_for_money() -> Apartment:
 
 def profit_per_month(year: int) -> List[Tuple[int, float]]:
     conn = None
+    res= []
     try:
         query = """
-                SELECT strftime('%m', end_date) AS mon, SUM(total_price * 0.15) AS profit
-                FROM reservations
-                WHERE strftime('%Y', end_date) = ?
+                WITH Months AS (
+                SELECT 1 AS month_number
+                UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7
+                UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10
+                UNION ALL SELECT 11 UNION ALL SELECT 12
+                )
+                SELECT Months.month_number AS mon,COALESCE(SUM(total_price * 0.15), 0) AS profit
+                FROM Months
+                LEFT JOIN reservations ON EXTRACT(MONTH FROM start_date)  = Months.month_number
+                       AND EXTRACT(YEAR FROM end_date) ="""+str(year)+"""
                 GROUP BY mon
-                ORDER BY mon;
+                ORDER BY mon
                 """
         conn = Connector.DBConnector()
-        result = conn.execute(query, (year,))
+        rows, mp = conn.execute(query)
+        if (mp is not None) and rows > 0:
+            for index in range(mp.size()):
+                current_row = mp[index]
+                res.append((current_row['mon'],current_row['profit']))
+        result = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         print(e)
     except DatabaseException.NOT_NULL_VIOLATION as e:
@@ -1028,7 +1042,7 @@ def profit_per_month(year: int) -> List[Tuple[int, float]]:
         print(e)
     finally:
         conn.close()
-        return result
+        return res
     pass
 
 
