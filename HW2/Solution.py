@@ -91,8 +91,8 @@ def create_tables():
 
     # reservations
     attributes = []
-    attributes.append("customer_id INTEGER  REFERENCES Customer(customer_id) ON DELETE SET NULL ")
-    attributes.append("apartment_id INTEGER  REFERENCES Apartment(apartment_id) ON DELETE SET NULL ")
+    attributes.append("customer_id INTEGER  REFERENCES Customer(customer_id) ON DELETE SET NULL CHECK (customer_id IS NULL OR customer_id > 0)")
+    attributes.append("apartment_id INTEGER  REFERENCES Apartment(apartment_id) ON DELETE SET NULL CHECK (apartment_id > 0 OR apartment_id IS NULL)")
     attributes.append("start_date DATE NOT NULL")
     attributes.append("end_date DATE NOT NULL CHECK (end_date > start_date)")
     attributes.append("total_price INTEGER NOT NULL CHECK (total_price > 0)")
@@ -551,6 +551,8 @@ def customer_cancelled_reservation(
 ) -> ReturnValue:
     conn = None
     rows_affected = 0
+    if customer_id <= 0 or apartment_id <= 0  :
+        return ReturnValue.BAD_PARAMS
     result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
@@ -589,6 +591,8 @@ def customer_reviewed_apartment(
     review_text: str,
 ) -> ReturnValue:
     conn = None
+    if rating<=0 or customer_id <= 0 or apartment_id <= 0  or rating > 10 :
+        return ReturnValue.BAD_PARAMS
     result = ReturnValue.OK
     if rating < 0 or rating > 10:
         result = ReturnValue.BAD_PARAMS
@@ -600,7 +604,7 @@ def customer_reviewed_apartment(
             WHERE EXISTS (
                 SELECT 1 FROM Reservations
                 WHERE customer_id = {customer_id} AND apartment_id = {apartment_id}
-                AND end_date < {review_date}
+                AND end_date <= {review_date}
             ); 
            """).format(
             customer_id=sql.Literal(customer_id),
@@ -640,8 +644,8 @@ def customer_updated_review(
 ) -> ReturnValue:
     conn = None
     result = ReturnValue.OK
-    if new_rating < 0 or new_rating > 10:
-        result = ReturnValue.BAD_PARAMS
+    if new_rating <= 0 or customer_id <= 0 or apartment_id <= 0 or new_rating > 10:
+        return ReturnValue.BAD_PARAMS
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
