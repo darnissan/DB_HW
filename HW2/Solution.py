@@ -323,6 +323,7 @@ def delete_owner(owner_id: int) -> ReturnValue:
 
 def add_apartment(apartment: Apartment) -> ReturnValue:
     # TODO: implement
+
     conn = None
     result = ReturnValue.OK
     try:
@@ -374,6 +375,8 @@ def get_apartment(apartment_id: int) -> Apartment:
 
 def delete_apartment(apartment_id: int) -> ReturnValue:
     conn = None
+    if apartment_id is None or apartment_id <=0 :
+        return ReturnValue.BAD_PARAMS
     result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
