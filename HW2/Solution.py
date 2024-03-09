@@ -212,7 +212,7 @@ def make_owner_city_apartments():
 def make_customer_apartments():
     attributes = []
     attributes.append("SELECT customer_id,COUNT(apartment_id) AS customer_count")
-    attributes.append("FROM Reservations GROUP BY customer_id")
+    attributes.append("FROM Reservations GROUP BY customer_id ORDER BY customer_id")
     make_view("Customer_apartments", attributes)
 
 
@@ -1006,11 +1006,11 @@ def profit_per_month(year: int) -> List[Tuple[int, float]]:
     conn = None
     try:
         query = """
-                SELECT strftime('%m', end_date) AS month, SUM(total_price * 0.15) AS profit
+                SELECT strftime('%m', end_date) AS mon, SUM(total_price * 0.15) AS profit
                 FROM reservations
                 WHERE strftime('%Y', end_date) = ?
-                GROUP BY month
-                ORDER BY month;
+                GROUP BY mon
+                ORDER BY mon;
                 """
         conn = Connector.DBConnector()
         result = conn.execute(query, (year,))
