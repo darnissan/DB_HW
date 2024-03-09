@@ -197,7 +197,13 @@ def make_owner_reviews():
     attributes.append("ON Owner_Apartments.Apartment_ID = Apartment_Reviews.apartment_id")
     make_view("Owner_reviews", attributes)
 
-
+def make_owner_reservations():
+    attributes = []
+    attributes.append("SELECT oa.Owner_ID,o.Owner_Name,oa.Apartment_ID, r.start_date, r.end_date, r.total_price")
+    attributes.append("FROM Owner_Apartments oa")
+    attributes.append("INNER JOIN Reservations r on oa.apartment_id=r.apartment_id")
+    attributes.append("INNER JOIN Owner o ON oa.Owner_ID = o.Owner_ID;")
+    make_view("Owner_Reservations", attributes)
 def make_owner_city_apartments():
     attributes = []
     attributes.append("SELECT Owner_Apartments.Owner_ID,Owner_Name,City,Country ")
@@ -548,11 +554,14 @@ def customer_made_reservation(customer_id: int, apartment_id: int, start_date: d
             conn.close()
         return result
 
+
 def customer_cancelled_reservation(
         customer_id: int, apartment_id: int, start_date: date
 ) -> ReturnValue:
     conn = None
     rows_affected = 0
+    if customer_id <= 0 or apartment_id <= 0:
+        return ReturnValue.BAD_PARAMS
     result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
@@ -591,6 +600,8 @@ def customer_reviewed_apartment(
         review_text: str,
 ) -> ReturnValue:
     conn = None
+    if rating <= 0 or customer_id <= 0 or apartment_id <= 0 or rating > 10:
+        return ReturnValue.BAD_PARAMS
     result = ReturnValue.OK
     if rating < 0 or rating > 10:
         result = ReturnValue.BAD_PARAMS
@@ -602,7 +613,7 @@ def customer_reviewed_apartment(
             WHERE EXISTS (
                 SELECT 1 FROM Reservations
                 WHERE customer_id = {customer_id} AND apartment_id = {apartment_id}
-                AND end_date < {review_date}
+                AND end_date <= {review_date}
             ); 
            """).format(
             customer_id=sql.Literal(customer_id),
@@ -642,8 +653,8 @@ def customer_updated_review(
 ) -> ReturnValue:
     conn = None
     result = ReturnValue.OK
-    if new_rating < 0 or new_rating > 10:
-        result = ReturnValue.BAD_PARAMS
+    if new_rating <= 0 or customer_id <= 0 or apartment_id <= 0 or new_rating > 10:
+        return ReturnValue.BAD_PARAMS
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
@@ -854,41 +865,63 @@ def get_owner_rating(owner_id: int) -> float:
 
 def get_top_customer() -> Customer:
     conn = None
+    res=None
     try:
+        # Assuming make_owner_reviews() and make_customer_apartments() are needed for other purposes not shown
         conn = Connector.DBConnector()
-        make_customer_apartments()
-        sub_query = "(SELECT customer_id,MAX(customer_count) FROM Customer_apartments)"
-        sub_query2 = "(SELECT customer_id FROM" + sub_query + " LIMIT 1)"
-        res = conn.execute("SELECT * FROM Customer WHERE " + sub_query2 + "=customer_id")
-        return res
-    except DatabaseException.ConnectionInvalid as e:
-        # do stuff
-        print(e)
-    except DatabaseException.NOT_NULL_VIOLATION as e:
-        # do stuff
-        print(e)
-    except DatabaseException.CHECK_VIOLATION as e:
-        # do stuff
-        print(e)
-    except DatabaseException.UNIQUE_VIOLATION as e:
-        # do stuff
-        print(e)
-    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        # do stuff
-        print(e)
+        query =sql.SQL( """
+        SELECT c.*
+        FROM Customer c
+        JOIN (
+            SELECT customer_id, COUNT(*) AS reservation_count
+            FROM Reservations
+            GROUP BY customer_id
+            ORDER BY reservation_count DESC, customer_id ASC
+            LIMIT 1
+        ) AS top_customer ON c.customer_id = top_customer.customer_id
+        """)
+        rows,customers = conn.execute(query)
+        res=Customer(customers[0]['Customer_ID'],customers[0]['Customer_Name'])
+        # Assuming 'res' is the customer record in a suitable format
+          # You might need to adjust this part based on how your data is returned
+        if rows == 0:
+            res = Customer.bad_customer()
+
     except Exception as e:
         print(e)
+        res=Customer.bad_customer()
     finally:
-        # will happen any way after code try termination or exception handling
-        conn.close()
-    pass
+        if conn is not None:
+            conn.close()
+        return res
+
+
+# Note: The 'Customer' return type hint implies you have a defined Customer class or data structure.
+# You may need to adjust the return statement to correctly instantiate or format this Customer object.
 
 
 def reservations_per_owner() -> List[Tuple[str, int]]:
     conn = None
+    make_owner_reservations()
+    result=[]
     try:
         conn = Connector.DBConnector()
-        return conn.execute("SELECT Name,COUNT(apartment_id) FROM Owner_Reservations GROUP BY apartment_id)")
+        query = sql.SQL("""SELECT o.Owner_Name, COALESCE(r.total_reservation_count, 0) AS total_reservation_count
+FROM Owner o
+LEFT JOIN (
+    SELECT Owner_ID, COUNT(*) AS total_reservation_count
+    FROM Owner_Reservations
+    GROUP BY Owner_ID
+) r ON o.Owner_ID = r.Owner_ID
+ORDER BY o.Owner_Name;
+""")
+        _,reservations  = conn.execute(query)
+        for index in range(reservations.size()):
+            current_row = reservations[index]
+            # Ensure the keys match the SQL output
+            result.append(
+                (current_row["Owner_Name"], current_row["total_reservation_count"])
+            )
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -907,8 +940,10 @@ def reservations_per_owner() -> List[Tuple[str, int]]:
     except Exception as e:
         print(e)
     finally:
+
         # will happen any way after code try termination or exception handling
         conn.close()
+        return result
     pass
 
 
@@ -958,7 +993,8 @@ def best_value_for_money() -> Apartment:
     result =  None
     try:
         query = """
-                SELECT a.Apartment_ID, MAX(reviews_avg_rating / avg_nightly_price) AS value_for_money
+                SELECT Apartment_ID,Adress,City,Country,Size FROM (
+                SELECT *, MAX(reviews_avg_rating / avg_nightly_price) AS value_for_money
                 FROM Apartment a
                 JOIN (
                   SELECT r.Apartment_ID,
@@ -972,9 +1008,9 @@ def best_value_for_money() -> Apartment:
                   FROM Apartment_Reviews rev
                   GROUP BY rev.apartment_id
                 ) AS review_ratings ON a.Apartment_ID = review_ratings.apartment_id
-                GROUP BY a.apartment_id
+                GROUP BY a.Apartment_ID
                 ORDER BY value_for_money DESC
-                LIMIT 1;
+                LIMIT 1);
                 """
         conn = Connector.DBConnector()
         result = conn.execute(query)
@@ -1027,7 +1063,6 @@ def profit_per_month(year: int) -> List[Tuple[int, float]]:
             for index in range(mp.size()):
                 current_row = mp[index]
                 res.append((current_row['mon'],current_row['profit']))
-        result = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         print(e)
     except DatabaseException.NOT_NULL_VIOLATION as e:
