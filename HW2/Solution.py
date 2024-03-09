@@ -152,6 +152,7 @@ def clear_tables():
     except Exception as e:
         print(e)
     finally:
+    finally:
         # will happen any way after code try termination or exception handling
         conn.close()
     pass
@@ -778,6 +779,7 @@ def get_apartment_rating(apartment_id: int) -> float:
     res=None
     try:
         make_owner_reviews()
+        make_owner_reviews()
         conn = Connector.DBConnector()
         query = "(SELECT AVG(Rating) FROM Owner_Reviews WHERE Apartment_ID={0})".format(apartment_id)
         _, res = conn.execute(query)
@@ -844,6 +846,7 @@ def get_owner_rating(owner_id: int) -> float:
 def get_top_customer() -> Customer:
     conn = None
     try:
+        make_owner_reviews()
         conn = Connector.DBConnector()
         make_customer_apartments()
         sub_query="(SELECT customer_id,MAX(customer_count) FROM Customer_apartments)"
