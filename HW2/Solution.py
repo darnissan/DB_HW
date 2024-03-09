@@ -548,7 +548,6 @@ def customer_made_reservation(customer_id: int, apartment_id: int, start_date: d
             conn.close()
         return result
 
-
 def customer_cancelled_reservation(
         customer_id: int, apartment_id: int, start_date: date
 ) -> ReturnValue:
@@ -956,26 +955,27 @@ def get_all_location_owners() -> List[Owner]:
 
 def best_value_for_money() -> Apartment:
     conn = None
+    result =  None
     try:
         query = """
-                SELECT a.apartment_id, a.name, MAX(reviews_avg_rating / avg_nightly_price) AS value_for_money
-    FROM apartments a
-    JOIN (
-      SELECT r.apartment_id,
-         AVG(r.total_price / NULLIF(julianday(r.end_date) - julianday(r.start_date), 0)) AS avg_nightly_price
-      FROM reservations r
-      GROUP BY r.apartment_id
-    ) AS reservation_prices ON a.apartment_id = reservation_prices.apartment_id
-    JOIN (
-      SELECT rev.apartment_id,
-         AVG(rev.rating) AS reviews_avg_rating
-      FROM reviews rev
-      GROUP BY rev.apartment_id
-    ) AS review_ratings ON a.apartment_id = review_ratings.apartment_id
-    GROUP BY a.apartment_id, a.name
-    ORDER BY value_for_money DESC
-    LIMIT 1;
-    """
+                SELECT a.Apartment_ID, MAX(reviews_avg_rating / avg_nightly_price) AS value_for_money
+                FROM Apartment a
+                JOIN (
+                  SELECT r.Apartment_ID,
+                     AVG(r.total_price / NULLIF(r.end_date - r.start_date, 0)) AS avg_nightly_price
+                  FROM reservations r
+                  GROUP BY r.Apartment_ID
+                ) AS reservation_prices ON a.Apartment_ID= reservation_prices.apartment_id
+                JOIN (
+                  SELECT rev.apartment_id,
+                     AVG(rev.rating) AS reviews_avg_rating
+                  FROM Apartment_Reviews rev
+                  GROUP BY rev.apartment_id
+                ) AS review_ratings ON a.Apartment_ID = review_ratings.apartment_id
+                GROUP BY a.apartment_id
+                ORDER BY value_for_money DESC
+                LIMIT 1;
+                """
         conn = Connector.DBConnector()
         result = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
