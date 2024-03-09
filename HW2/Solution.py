@@ -200,11 +200,12 @@ def make_owner_reviews():
 
 def make_owner_city_apartments():
     attributes = []
-    attributes.append("SELECT Owner_ID,Name,City ")
-    attributes.append("FROM Owner_Apartments INNER JOIN Apartment_Reviews ")
-    attributes.append("ON Owner_Apartments.Owner_ID=Apartment_Reviews.Owner_ID ")
-    attributes.append("AND Owner_Apartments.Apartment_ID=Apartment_Reviews.Apartment_ID ")
+    attributes.append("SELECT Owner_Apartments.Owner_ID,Owner_Name,City,Country ")
+    attributes.append("FROM Owner_Apartments INNER JOIN Apartment")
+    #attributes.append("ON Owner_Apartments.Owner_ID=Apartment_Reviews.Owner_ID ")
+    attributes.append("ON Owner_Apartments.Apartment_ID=Apartment.Apartment_ID ")
     attributes.append("INNER JOIN Owner ON Owner_Apartments.Owner_ID= Owner.Owner_ID")
+    #attributes.append("INNER JOIN Apartment ON Owner_Apartments.Apartment_ID= Apartment.Apartment_ID")
     make_view("Owner_city_apartments", attributes)
 
 
@@ -917,12 +918,18 @@ def reservations_per_owner() -> List[Tuple[str, int]]:
 def get_all_location_owners() -> List[Owner]:
     # join to get cities for apartments
     conn = None
+    res=[]
     try:
         conn = Connector.DBConnector()
         make_owner_city_apartments()
-        query = ("SELECT Owner_ID,Name FROM Owner_city_apartments GROUP BY name "
-                 "HAVING COUNT(DISTINCT City) = (SELECT COUNT(DISTINCT City) FROM Owner_city_apartments);")
-        return conn.execute(query)
+        query = ("SELECT Owner_ID,Owner_Name FROM Owner_city_apartments GROUP BY Owner_ID,Owner_Name "
+                 "HAVING COUNT(DISTINCT CONCAT(City, ', ', Country))= (SELECT COUNT(DISTINCT CONCAT(City, ', ', Country)) FROM Apartment);")
+        op=conn.execute(query)
+        rows, owner = conn.execute(query)
+        if (owner is not None) and rows > 0:
+            for index in range(owner.size()):
+                current_row = owner[index]
+                res.append(Owner(current_row['Owner_ID'], current_row['Owner_Name']))
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -943,6 +950,7 @@ def get_all_location_owners() -> List[Owner]:
     finally:
         # will happen any way after code try termination or exception handling
         conn.close()
+        return res
     pass
 
 
