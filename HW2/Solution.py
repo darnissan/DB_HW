@@ -586,7 +586,7 @@ def customer_updated_review(
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
-            "UPDATE Apartment_Reviews SET rating={0},review_text={1} WHERE customer_id={2} AND apartment_id={3} AND review_date={4}"
+            "UPDATE Apartment_Reviews SET rating={0},review_text={1},review_date={4} WHERE customer_id={2} AND apartment_id={3} AND review_date<={4}"
         ).format(
             sql.Literal(new_rating),
             sql.Literal(new_text),
@@ -594,7 +594,7 @@ def customer_updated_review(
             sql.Literal(apartment_id),
             sql.Literal(update_date),
         )
-        rows_affected = conn.execute(query)
+        rows_affected,_ = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
@@ -608,8 +608,9 @@ def customer_updated_review(
     except Exception as e:
         result = ReturnValue.ERROR
     finally:
-        if rows_affected == 0:
-            result = ReturnValue.NOT_EXISTS
+        if result == ReturnValue.OK :
+            if rows_affected == 0:
+                result = ReturnValue.NOT_EXISTS
         conn.close()
         return result
     pass
