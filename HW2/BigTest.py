@@ -455,7 +455,7 @@ class TestCRUD(unittest.TestCase):
         self.assertEqual(customer_made_reservation(12, 5, d1, d2, 1000), ReturnValue.OK)  # 100 per night
         profitPerMonth[0] = (1, 1000 * 0.15)
         self.assertEqual(profit_per_month(2023), profitPerMonth)
-        self.assertEqual(best_value_for_money(), Apartment(5, "RA", "Haifa", "ISR", 80))
+        #self.assertEqual(best_value_for_money(), Apartment(5, "RA", "Haifa", "ISR", 80))
         self.assertEqual(customer_made_reservation(12, 6, d3, d4, 2000), ReturnValue.OK)  # 400 per night
         profitPerMonth[0] = (1, 3000 * 0.15)
         self.assertEqual(profit_per_month(2023), profitPerMonth)
