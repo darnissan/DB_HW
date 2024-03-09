@@ -237,18 +237,18 @@ def make_customer_ratio(customer_ID):
     # get ratios
     attributes = []
     attributes.append("SELECT customer_id,AVG(Cust1_apartments.rating/Apartment_Reviews.rating) AS ratio ")
-    attributes.append("FROM Apartment_Reviews GROUP BY customer_id")
-    attributes.append("JOIN Cust1_apartments ")
-    attributes.append("ON Cust1_apartments.apartment_id=Apartment_Reviews.apartment_id_ID ")
-    attributes.append("AND Apartment_Reviews.customer_id !=customer_ID")
+    attributes.append("FROM Apartment_Reviews")
+    attributes.append("INNER JOIN Cust1_apartments ")
+    attributes.append("ON Cust1_apartments.apartment_id=Apartment_Reviews.apartment_id ")
+    attributes.append("AND Apartment_Reviews.customer_id !=customer_ID GROUP BY customer_id")
     make_view("Apartment_ratios", attributes)
 
     # get approximations
     attributes = []
     attributes.append("SELECT apartment_id,GREATEST(1,LEAST(10,AVG(ratio * Apartment_Reviews.rating))) ")
-    attributes.append("FROM Apartment_Reviews GROUP BY apartment_id")
-    attributes.append("JOIN Apartment_ratios ")
-    attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id")
+    attributes.append("FROM Apartment_Reviews")
+    attributes.append("INNER JOIN Apartment_ratios ")
+    attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id GROUP BY apartment_id")
     make_view("Apartment_approximations", attributes)
 
 
