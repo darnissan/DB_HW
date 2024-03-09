@@ -46,7 +46,7 @@ def make_view(viewName,attributes):
     conn = None
     try:
         conn = Connector.DBConnector()
-        query = "CREATE VIEW " + viewName + " AS\n"
+        query = "CREATE OR REPLACE VIEW " + viewName + " AS\n"
         # Directly concatenate the parts of the SQL query
         query += " ".join(attributes)
         query += ";"
@@ -195,6 +195,18 @@ def make_owner_reviews():
     attributes.append("FROM Owner_Apartments LEFT OUTER JOIN Apartment_Reviews ")
     attributes.append("ON Owner_Apartments.Apartment_ID = Apartment_Reviews.apartment_id")
     make_view("Owner_reviews", attributes)
+    '''SELECT oa.Owner_ID, o.Owner_Name, oa.Apartment_ID, r.Reservation_ID, r.SomeOtherReservationDetails
+        FROM Owner_Apartments oa
+        INNER JOIN Reservations r ON oa.Apartment_ID = r.Apartment_ID
+        INNER JOIN Owner o ON oa.Owner_ID = o.Owner_ID;
+    '''
+def make_owner_reservations():
+    attributes = []
+    attributes.append("SELECT oa.Owner_ID,o.Owner_Name,oa.Apartment_ID, r.start_date, r.end_date, r.total_price")
+    attributes.append("FROM Owner_Apartments oa")
+    attributes.append("INNER JOIN Reservations r on oa.apartment_id=r.apartment_id") 
+    attributes.append("INNER JOIN Owner o ON oa.Owner_ID = o.Owner_ID;")
+    make_view("Owner_Reservations", attributes)
 
 def make_owner_city_apartments():
     attributes = []
@@ -841,41 +853,60 @@ def get_owner_rating(owner_id: int) -> float:
 def get_top_customer() -> Customer:
     conn = None
     try:
-        make_owner_reviews()
+        # Assuming make_owner_reviews() and make_customer_apartments() are needed for other purposes not shown
         conn = Connector.DBConnector()
-        make_customer_apartments()
-        sub_query="(SELECT customer_id,MAX(customer_count) FROM Customer_apartments)"
-        sub_query2 = "(SELECT customer_id FROM" + sub_query + " LIMIT 1)"
-        res = conn.execute("SELECT * FROM Customer WHERE "+sub_query2+"=customer_id")
-        return res
-    except DatabaseException.ConnectionInvalid as e:
-        # do stuff
-        print(e)
-    except DatabaseException.NOT_NULL_VIOLATION as e:
-        # do stuff
-        print(e)
-    except DatabaseException.CHECK_VIOLATION as e:
-        # do stuff
-        print(e)
-    except DatabaseException.UNIQUE_VIOLATION as e:
-        # do stuff
-        print(e)
-    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        # do stuff
-        print(e)
+        query =sql.SQL( """
+        SELECT c.*
+        FROM Customer c
+        JOIN (
+            SELECT customer_id, COUNT(*) AS reservation_count
+            FROM Reservations
+            GROUP BY customer_id
+            ORDER BY reservation_count DESC, customer_id ASC
+            LIMIT 1
+        ) AS top_customer ON c.customer_id = top_customer.customer_id
+        """)
+        rows,customers = conn.execute(query)
+        res=Customer(customers[0]['Customer_ID'],customers[0]['Customer_Name'])
+        # Assuming 'res' is the customer record in a suitable format
+          # You might need to adjust this part based on how your data is returned
+        if rows == 0:
+            res = Customer.bad_customer()
+
     except Exception as e:
         print(e)
+        res=Customer.bad_customer()
     finally:
-        # will happen any way after code try termination or exception handling
-        conn.close()
-    pass
+        if conn is not None:
+            conn.close()
+        return res
+
+# Note: The 'Customer' return type hint implies you have a defined Customer class or data structure.
+# You may need to adjust the return statement to correctly instantiate or format this Customer object.
 
 
 def reservations_per_owner() -> List[Tuple[str, int]]:
     conn = None
+    make_owner_reservations()
+    result=[]
     try:
         conn = Connector.DBConnector()
-        return conn.execute("SELECT Name,COUNT(apartment_id) FROM Owner_Reservations GROUP BY apartment_id)")
+        query = sql.SQL("""SELECT o.Owner_Name, COALESCE(r.total_reservation_count, 0) AS total_reservation_count
+FROM Owner o
+LEFT JOIN (
+    SELECT Owner_ID, COUNT(*) AS total_reservation_count
+    FROM Owner_Reservations
+    GROUP BY Owner_ID
+) r ON o.Owner_ID = r.Owner_ID
+ORDER BY o.Owner_Name;
+""")
+        _,reservations  = conn.execute(query)
+        for index in range(reservations.size()):
+            current_row = reservations[index]
+            # Ensure the keys match the SQL output
+            result.append(
+                (current_row["Owner_Name"], current_row["total_reservation_count"])
+            )
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -894,8 +925,10 @@ def reservations_per_owner() -> List[Tuple[str, int]]:
     except Exception as e:
         print(e)
     finally:
+
         # will happen any way after code try termination or exception handling
         conn.close()
+        return result
     pass
 
 
