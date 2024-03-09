@@ -91,8 +91,8 @@ def create_tables():
 
     # reservations
     attributes = []
-    attributes.append("customer_id INTEGER NOT NULL REFERENCES Customer(customer_id) ON DELETE SET NULL ")
-    attributes.append("apartment_id INTEGER NOT NULL REFERENCES Apartment(apartment_id) ON DELETE SET NULL ")
+    attributes.append("customer_id INTEGER  REFERENCES Customer(customer_id) ON DELETE SET NULL ")
+    attributes.append("apartment_id INTEGER  REFERENCES Apartment(apartment_id) ON DELETE SET NULL ")
     attributes.append("start_date DATE NOT NULL")
     attributes.append("end_date DATE NOT NULL CHECK (end_date > start_date)")
     attributes.append("total_price INTEGER NOT NULL CHECK (total_price > 0)")
@@ -156,13 +156,12 @@ def clear_tables():
         conn.close()
     pass
 
-
 def drop_tables():
     conn = None
     try:
         conn = Connector.DBConnector()
         for tab in Table_Names:
-            conn.execute("DROP TABLE " + tab + " CASCADE ;")
+            conn.execute("DROP TABLE IF EXISTS " + tab + " CASCADE ;")
         for view in Views:
             conn.execute("DROP VIEW IF EXISTS " + view + ";")
     except DatabaseException.ConnectionInvalid as e:
