@@ -118,8 +118,10 @@ def create_tables():
     attributes.append(
         "owner_id INTEGER REFERENCES owner(owner_id) ON DELETE SET NULL CHECK (owner_id IS NULL OR owner_id > 0)"
     )
-    attributes.append("apartment_id INTEGER REFERENCES Apartment(apartment_id) ON DELETE SET NULL CHECK (apartment_id > 0 OR apartment_id IS NULL)")
-    attributes.append("CONSTRAINT UC_Owner_Apts UNIQUE (owner_id,apartment_id)")
+    attributes.append(
+        "apartment_id INTEGER UNIQUE REFERENCES Apartment(apartment_id) ON DELETE SET NULL CHECK (apartment_id > 0 OR apartment_id IS NULL)"
+    )
+    # attributes.append("CONSTRAINT UC_Owner_Apts UNIQUE (owner_id,apartment_id)")
     make_table("Owner_Apartments", attributes)
 
     pass
@@ -702,6 +704,8 @@ def owner_owns_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
 
 def owner_drops_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
     conn = None
+    if owner_id<=0 or apartment_id<=0 :
+        return ReturnValue.BAD_PARAMS
     result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
