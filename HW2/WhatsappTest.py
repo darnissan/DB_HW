@@ -349,6 +349,9 @@ class WhatsappTests(AbstractTest):
         review3 = {'customer_id': 2, 'apartment_id': 3, 'review_date': date(
             2016, 3, 3), 'rating': 3, 'review_text': 'good'}
         self.assertEqual(ReturnValue.OK, Solution.customer_reviewed_apartment(**review3), 'add review')
+        self.assertEqual(ReturnValue.OK, Solution.owner_owns_apartment(1, 1), 'add ownership')
+        self.assertEqual(ReturnValue.OK, Solution.owner_owns_apartment(1, 2), 'add ownership')
+        self.assertEqual(ReturnValue.OK, Solution.owner_owns_apartment(1, 3), 'add ownership')
         self.assertEqual(4, Solution.get_owner_rating(1), 'get owner rating')
 
 

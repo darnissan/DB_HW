@@ -152,7 +152,6 @@ def clear_tables():
     except Exception as e:
         print(e)
     finally:
-    finally:
         # will happen any way after code try termination or exception handling
         conn.close()
     pass
@@ -812,34 +811,20 @@ def get_apartment_rating(apartment_id: int) -> float:
 
 def get_owner_rating(owner_id: int) -> float:
     conn = None
+    res = 0
     try:
         make_owner_reviews()
         conn = Connector.DBConnector()
-
-        query=sql.SQL("SELECT((SELECT AVG(COALESCE(Rating,0)) from Owner_Reviews WHERE Owner_ID={0} GROUP BY Apartment_ID)) ;").format(owner_id)
-
-        res=conn.execute(query)
-        return res
+        sub_query = "(SELECT AVG(COALESCE(Rating,0)) AS avg_rating FROM Owner_Reviews WHERE Owner_ID="+str(owner_id)+" GROUP BY Apartment_ID) AS subquery;"
+        query = "SELECT AVG(subquery.avg_rating) FROM" + sub_query
+        res = float(conn.execute(query)[1][0]['avg'])
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
-        print(e)
-    except DatabaseException.NOT_NULL_VIOLATION as e:
-        # do stuff
-        print(e)
-    except DatabaseException.CHECK_VIOLATION as e:
-        # do stuff
-        print(e)
-    except DatabaseException.UNIQUE_VIOLATION as e:
-        # do stuff
-        print(e)
-    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
-        # do stuff
-        print(e)
-    except Exception as e:
         print(e)
     finally:
         # will happen any way after code try termination or exception handling
         conn.close()
+        return res
     pass
 
 
