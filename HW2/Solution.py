@@ -91,8 +91,8 @@ def create_tables():
 
     # reservations
     attributes = []
-    attributes.append("customer_id INTEGER NOT NULL REFERENCES Customer(customer_id) ")
-    attributes.append("apartment_id INTEGER NOT NULL REFERENCES Apartment(apartment_id) ")
+    attributes.append("customer_id INTEGER NOT NULL REFERENCES Customer(customer_id) ON DELETE SET NULL ")
+    attributes.append("apartment_id INTEGER NOT NULL REFERENCES Apartment(apartment_id) ON DELETE SET NULL ")
     attributes.append("start_date DATE NOT NULL")
     attributes.append("end_date DATE NOT NULL CHECK (end_date > start_date)")
     attributes.append("total_price INTEGER NOT NULL CHECK (total_price > 0)")
@@ -103,8 +103,8 @@ def create_tables():
 
     # reviews
     attributes = []
-    attributes.append("customer_id INTEGER NOT NULL REFERENCES Customer(customer_id) ")
-    attributes.append("apartment_id INTEGER NOT NULL REFERENCES Apartment(apartment_id) ")
+    attributes.append("customer_id INTEGER NOT NULL REFERENCES Customer(customer_id) ON DELETE SET NULL")
+    attributes.append("apartment_id INTEGER NOT NULL REFERENCES Apartment(apartment_id) ON DELETE SET NULL")
     attributes.append("review_date DATE NOT NULL")
     attributes.append("rating INTEGER NOT NULL CHECK (rating > 0 AND rating <= 10)")
     attributes.append("review_text TEXT NOT NULL")
@@ -275,22 +275,43 @@ def get_owner(owner_id: int) -> Owner:
 
 
 def delete_owner(owner_id: int) -> ReturnValue:
+    # Initial check for a valid owner_id
+    if (owner_id <= 0):
+        return ReturnValue.BAD_PARAMS
+
     conn = None
+    rows = 0  # Initialize rows affected
+    result = ReturnValue.OK  # Assume OK unless an exception occurs
+
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("DELETE FROM Owner WHERE id={0}").format(sql.Literal(owner_id))
-        conn.execute(query)
-    except DatabaseException.UNIQUE_VIOLATION:
-        return ReturnValue.NOT_EXISTS
-    except DatabaseException.CHECK_VIOLATION:
-        return ReturnValue.BAD_PARAMS
-    except DatabaseException:
-        return ReturnValue.ERROR
+        query = sql.SQL("DELETE FROM Owner WHERE owner_id={0}").format(
+            sql.Literal(owner_id)
+        )
+        rows, _ = conn.execute(query)  # Execute the delete query
+        
+        # Check if rows affected is 0, implying owner did not exist
+        if rows == 0:
+            result = ReturnValue.NOT_EXISTS
+    except DatabaseException.UNIQUE_VIOLATION as e:
+        result = ReturnValue.NOT_EXISTS
+    except DatabaseException.CHECK_VIOLATION as e:
+        result = ReturnValue.BAD_PARAMS
+    except DatabaseException.NOT_NULL_VIOLATION as e:
+        result = ReturnValue.BAD_PARAMS
+    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
+        result = ReturnValue.NOT_EXISTS
+    except DatabaseException.ConnectionInvalid as e:
+        result = ReturnValue.ERROR
+    except Exception as e:
+        print(e)
+        result = ReturnValue.ERROR
     finally:
-        conn.close()
-        return ReturnValue.OK
+        if conn is not None:
+            conn.close()
 
-    pass
+    return result
+
 
 
 
@@ -332,12 +353,18 @@ def get_apartment(apartment_id: int) -> Apartment:
     result = 0
     try:
         conn = Connector.DBConnector()
-        result = conn.execute("SELECT * FROM Apartment WHERE id=?", (apartment_id))
-    except DatabaseException:
-        return Apartment.bad_apartment()
+        query = sql.SQL("SELECT * FROM Apartment WHERE apartment_id = {0}").format(sql.Literal(apartment_id))
+        rows_effected, apts = conn.execute(query)
+        if apts is not None and rows_effected > 0:
+            result = Apartment(apts[0]['apartment_id'], apts[0]['address'], apts[0]['city'], apts[0]['country'],apts[0]['size'])
+        else:
+            result = Apartment.bad_apartment()
+    except Exception as e:
+        print(e)
+        result = Apartment.bad_apartment()
     finally:
         conn.close()
-        return result
+    return result
 
 
 def delete_apartment(apartment_id: int) -> ReturnValue:
@@ -405,21 +432,35 @@ def get_customer(customer_id: int) -> Customer:
 
 def delete_customer(customer_id: int) -> ReturnValue:
     conn = None
+    if (customer_id <= 0):
+        return ReturnValue.BAD_PARAMS
+    rows=0
+    result= ReturnValue.OK
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("DELETE FROM Customer WHERE id={0}").format(
+        query = sql.SQL("DELETE FROM Customer WHERE customer_id={0}").format(
             sql.Literal(customer_id)
         )
-        conn.execute(query)
-    except DatabaseException.UNIQUE_VIOLATION:
-        return ReturnValue.NOT_EXISTS
-    except DatabaseException.CHECK_VIOLATION:
-        return ReturnValue.BAD_PARAMS
-    except DatabaseException:
-        return ReturnValue.ERROR
+        rows,_ = conn.execute(query)
+    except DatabaseException.UNIQUE_VIOLATION as e:
+        result= ReturnValue.NOT_EXISTS
+    except DatabaseException.CHECK_VIOLATION as e:
+        result= ReturnValue.BAD_PARAMS
+    except DatabaseException.NOT_NULL_VIOLATION as e:
+        result= ReturnValue.BAD_PARAMS
+    except DatabaseException.FOREIGN_KEY_VIOLATION as e:
+        result= ReturnValue.NOT_EXISTS
+    except DatabaseException.ConnectionInvalid as e:
+        result= ReturnValue.ERROR
+    except Exception as e:
+        print(e)
+        result= ReturnValue.ERROR
     finally:
         conn.close()
-        return ReturnValue.OK
+        if (result == ReturnValue.OK):
+            if rows==0 :
+                result= ReturnValue.NOT_EXISTS
+        return result
 
 """ReturnValue customer_made_reservation(customer_id: int, apartment_id: int, start_date:
 date, end_date: date, total_price: float)
