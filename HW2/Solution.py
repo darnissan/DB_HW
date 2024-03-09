@@ -98,13 +98,13 @@ def create_tables():
     attributes.append("total_price INTEGER NOT NULL CHECK (total_price > 0)")
     # Remove the UNIQUE constraint on apartment_id as it would prevent more than one reservation per apartment
     # If needed, adjust the unique constraint below to suit your actual requirements
-    #attributes.append("CONSTRAINT UC_Reservation UNIQUE (customer_id, apartment_id, start_date, end_date)")
+    # attributes.append("CONSTRAINT UC_Reservation UNIQUE (customer_id, apartment_id, start_date, end_date)")
     make_table("Reservations", attributes)
 
     # reviews
     attributes = []
-    attributes.append("customer_id INTEGER NOT NULL REFERENCES Customer(customer_id) ON DELETE SET NULL")
-    attributes.append("apartment_id INTEGER NOT NULL REFERENCES Apartment(apartment_id) ON DELETE SET NULL")
+    attributes.append("customer_id INTEGER REFERENCES Customer(customer_id) ON DELETE SET NULL CHECK (customer_id IS NULL OR customer_id > 0)")
+    attributes.append("apartment_id INTEGER REFERENCES Apartment(apartment_id) ON DELETE SET NULL CHECK (apartment_id > 0 OR apartment_id IS NULL)")
     attributes.append("review_date DATE NOT NULL")
     attributes.append("rating INTEGER NOT NULL CHECK (rating > 0 AND rating <= 10)")
     attributes.append("review_text TEXT NOT NULL")
@@ -115,8 +115,10 @@ def create_tables():
 
     # owner and his apartments
     attributes = []
-    attributes.append("owner_id INTEGER NOT NULL CHECK (owner_id>0)")
-    attributes.append("apartment_id INTEGER NOT NULL UNIQUE CHECK (apartment_id>0)")
+    attributes.append(
+        "owner_id INTEGER REFERENCES owner(owner_id) ON DELETE SET NULL CHECK (owner_id IS NULL OR owner_id > 0)"
+    )
+    attributes.append("apartment_id INTEGER REFERENCES Apartment(apartment_id) ON DELETE SET NULL CHECK (apartment_id > 0 OR apartment_id IS NULL)")
     attributes.append("CONSTRAINT UC_Owner_Apts UNIQUE (owner_id,apartment_id)")
     make_table("Owner_Apartments", attributes)
 
@@ -185,7 +187,7 @@ def drop_tables():
         conn.close()
     pass
 
-#temp func to make review_owner tab
+# temp func to make review_owner tab
 def make_owner_reviews():
     attributes = []
     attributes.append("SELECT Owner_Apartments.Apartment_ID, Owner_ID, rating ")
@@ -319,8 +321,6 @@ def delete_owner(owner_id: int) -> ReturnValue:
     return result
 
 
-
-
 def add_apartment(apartment: Apartment) -> ReturnValue:
     # TODO: implement
     conn = None
@@ -350,7 +350,6 @@ def add_apartment(apartment: Apartment) -> ReturnValue:
     finally:
         conn.close()
         return result
-
 
 
 def get_apartment(apartment_id: int) -> Apartment:
@@ -680,7 +679,7 @@ def owner_owns_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
         query = sql.SQL(
             "INSERT INTO Owner_Apartments(owner_id,apartment_id) VALUES({0},{1})"
         ).format(sql.Literal(owner_id), sql.Literal(apartment_id))
-        conn.execute(query)
+        rows,_ = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         result = ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
@@ -707,7 +706,7 @@ def owner_drops_apartment(owner_id: int, apartment_id: int) -> ReturnValue:
         query = sql.SQL(
             "DELETE FROM Owner_Apartments WHERE owner_id={0} AND apartment_id={1}"
         ).format(sql.Literal(owner_id), sql.Literal(apartment_id))
-        rows_affected = conn.execute(query)
+        rows_affected,_ = conn.execute(query)
     except DatabaseException.ConnectionInvalid as e:
         result =  ReturnValue.ERROR
     except DatabaseException.NOT_NULL_VIOLATION as e:
@@ -809,14 +808,14 @@ def get_apartment_rating(apartment_id: int) -> float:
         return avg_rating
     pass
 
-
 def get_owner_rating(owner_id: int) -> float:
     conn = None
     try:
         make_owner_reviews()
         conn = Connector.DBConnector()
-        sub_query="(SELECT AVG(COALESCE(Rating,0)) from Owner_Reviews WHERE Owner_ID=owner_id GROUP BY Apartment_ID)"
-        query = "(SELECT AVG"+ sub_query
+
+        query=sql.SQL("SELECT((SELECT AVG(COALESCE(Rating,0)) from Owner_Reviews WHERE Owner_ID={0} GROUP BY Apartment_ID)) ;").format(owner_id)
+
         res=conn.execute(query)
         return res
     except DatabaseException.ConnectionInvalid as e:
