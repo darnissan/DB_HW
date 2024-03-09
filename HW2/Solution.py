@@ -333,6 +333,7 @@ def delete_owner(owner_id: int) -> ReturnValue:
 
 def add_apartment(apartment: Apartment) -> ReturnValue:
     # TODO: implement
+
     conn = None
     result = ReturnValue.OK
     try:
@@ -385,6 +386,8 @@ def get_apartment(apartment_id: int) -> Apartment:
 
 def delete_apartment(apartment_id: int) -> ReturnValue:
     conn = None
+    if apartment_id is None or apartment_id <= 0:
+        return ReturnValue.BAD_PARAMS
     result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
@@ -993,8 +996,8 @@ def best_value_for_money() -> Apartment:
     result =  None
     try:
         query = """
-                SELECT Apartment_ID,Adress,City,Country,Size FROM (
-                SELECT *, MAX(reviews_avg_rating / avg_nightly_price) AS value_for_money
+                SELECT Apartment_ID,Address,City,Country,Size FROM (
+                SELECT a.Apartment_ID,a.Address,a.City,a.Country,a.Size, MAX(reviews_avg_rating / avg_nightly_price) AS value_for_money
                 FROM Apartment a
                 JOIN (
                   SELECT r.Apartment_ID,
@@ -1008,12 +1011,18 @@ def best_value_for_money() -> Apartment:
                   FROM Apartment_Reviews rev
                   GROUP BY rev.apartment_id
                 ) AS review_ratings ON a.Apartment_ID = review_ratings.apartment_id
-                GROUP BY a.Apartment_ID
+                GROUP BY a.Apartment_ID,a.Address,a.City,a.Country,a.Size
                 ORDER BY value_for_money DESC
                 LIMIT 1);
                 """
         conn = Connector.DBConnector()
-        result = conn.execute(query)
+        rows,apartment= conn.execute(query)
+        if (apartment is not None) and rows > 0:
+            for index in range(apartment.size()):
+                current_row = apartment[index]
+                result=Apartment(current_row['Apartment_ID'], current_row['Address'],
+                                 current_row['City'], current_row['Country'],
+                                 current_row['Size'])
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -1050,9 +1059,9 @@ def profit_per_month(year: int) -> List[Tuple[int, float]]:
                 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10
                 UNION ALL SELECT 11 UNION ALL SELECT 12
                 )
-                SELECT Months.month_number AS mon,COALESCE(SUM(total_price * 0.15), 0) AS profit
+                SELECT Months.month_number AS mon,COALESCE(CAST(SUM(total_price * 0.15) AS FLOAT), 0) AS profit
                 FROM Months
-                LEFT JOIN reservations ON EXTRACT(MONTH FROM start_date)  = Months.month_number
+                LEFT JOIN reservations ON EXTRACT(MONTH FROM end_date)  = Months.month_number
                        AND EXTRACT(YEAR FROM end_date) ="""+str(year)+"""
                 GROUP BY mon
                 ORDER BY mon
