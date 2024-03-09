@@ -345,10 +345,10 @@ def delete_apartment(apartment_id: int) -> ReturnValue:
     result = ReturnValue.OK
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("DELETE FROM Apartments WHERE id={0}").format(
+        query = sql.SQL("DELETE FROM Apartment WHERE apartment_id={0}").format(
             sql.Literal(apartment_id)
         )
-        conn.execute(query)
+        rows_effected,_ = conn.execute(query)
     except DatabaseException.UNIQUE_VIOLATION:
         result = ReturnValue.NOT_EXISTS
     except DatabaseException.CHECK_VIOLATION:
@@ -356,6 +356,9 @@ def delete_apartment(apartment_id: int) -> ReturnValue:
     except DatabaseException:
         result = ReturnValue.ERROR
     finally:
+        if result == ReturnValue.OK:
+            if rows_effected == 0:
+                result=ReturnValue.NOT_EXISTS
         conn.close()
         return result
 
