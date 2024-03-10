@@ -13,7 +13,7 @@ from Business.Apartment import Apartment
 # ---------------------------------- CRUD API: ----------------------------------
 Table_Names = ["Reservations", "Apartment_Reviews", "Owner_Apartments","Owner", "Apartment", "Customer"]
 Views = ["Owner_reviews", "Owner_city_apartments", "Customer_apartments", "Cust1_apartments"
-    , "Apartment_ratios", "Apartment_approximations"]
+    , "Apartment_ratios", "Apartment_approximations","Apartment_approximations_normalized"]
 
 
 def make_table(tableName, attributes):
@@ -254,12 +254,20 @@ def make_customer_ratio(customer_ID):
 
     # get approximations
     attributes = []
-    attributes.append("SELECT apartment_id,GREATEST(1,LEAST(10,AVG(ratio * Apartment_Reviews.rating))) AS Rec")
+    attributes.append("SELECT Apartment_Reviews.apartment_id,AVG(ratio * Apartment_Reviews.rating) AS REC")
     attributes.append("FROM Apartment_Reviews")
     attributes.append("INNER JOIN Apartment_ratios ")
-    attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id GROUP BY apartment_id")
+    attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id ")
+    attributes.append("AND NOT EXISTS(SELECT apartment_id FROM Cust1_apartments WHERE Apartment_Reviews.apartment_id=apartment_id)")
+    attributes.append("GROUP BY Apartment_Reviews.apartment_id")
     make_view("Apartment_approximations", attributes)
 
+    #get approximations normalized from 1 to 10
+    attributes = []
+    attributes.append("SELECT apartment_id,GREATEST(1,LEAST(10,REC)) AS Rec")
+    attributes.append("FROM Apartment_approximations")
+    attributes.append("GROUP BY apartment_id,REC")
+    make_view("Apartment_approximations_normalized", attributes)
 
 def add_owner(owner: Owner) -> ReturnValue:
     conn = None
@@ -1109,8 +1117,8 @@ def get_apartment_recommendation(customer_id: int) -> List[Tuple[Apartment, floa
         make_customer_ratio(customer_id)
         # get approximation
         query = ("SELECT * "
-                 "FROM Apartment INNER JOIN Apartment_approximations "
-                 "ON Apartment.apartment_id=Apartment_approximations.apartment_id")
+                 "FROM Apartment INNER JOIN Apartment_approximations_normalized "
+                 "ON Apartment.apartment_id=Apartment_approximations_normalized.apartment_id")
         rows, apartment = conn.execute(query)
         if (apartment is not None) and rows > 0:
             for index in range(apartment.size()):
