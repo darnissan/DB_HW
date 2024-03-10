@@ -244,7 +244,7 @@ def make_customer_ratio(customer_ID):
 
     # get ratios
     attributes = []
-    attributes.append("SELECT customer_id,AVG(Cust1_apartments.rating/Apartment_Reviews.rating) AS ratio ")
+    attributes.append("SELECT customer_id,AVG((Cust1_apartments.rating/Apartment_Reviews.rating) AS FLOAT) AS ratio ")
     attributes.append("FROM Apartment_Reviews")
     attributes.append("INNER JOIN Cust1_apartments")
     attributes.append("ON (Cust1_apartments.apartment_id=Apartment_Reviews.apartment_id ")
@@ -254,7 +254,7 @@ def make_customer_ratio(customer_ID):
 
     # get approximations
     attributes = []
-    attributes.append("SELECT apartment_id,GREATEST(1,LEAST(10,AVG(ratio * Apartment_Reviews.rating))) ")
+    attributes.append("SELECT apartment_id,GREATEST(1,LEAST(10,AVG(ratio * Apartment_Reviews.rating))) AS Rec")
     attributes.append("FROM Apartment_Reviews")
     attributes.append("INNER JOIN Apartment_ratios ")
     attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id GROUP BY apartment_id")
@@ -1102,6 +1102,7 @@ def profit_per_month(year: int) -> List[Tuple[int, float]]:
 
 def get_apartment_recommendation(customer_id: int) -> List[Tuple[Apartment, float]]:
     conn = None
+    result=[]
     try:
         conn = Connector.DBConnector()
         # make ratio
@@ -1110,8 +1111,18 @@ def get_apartment_recommendation(customer_id: int) -> List[Tuple[Apartment, floa
         query = ("SELECT * "
                  "FROM Apartment INNER JOIN Apartment_approximations "
                  "ON Apartment.apartment_id=Apartment_approximations.apartment_id")
-        res=conn.execute(query)
-        return conn.execute(query)
+        rows, apartment = conn.execute(query)
+        if (apartment is not None) and rows > 0:
+            for index in range(apartment.size()):
+                current_row = apartment[index]
+                result.append(
+                    (Apartment(current_row["Apartment_ID"],
+                    current_row["Address"],
+                    current_row["City"],
+                    current_row["Country"],
+                    current_row["Size"]),
+                    current_row["Rec"])
+                )
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -1132,4 +1143,5 @@ def get_apartment_recommendation(customer_id: int) -> List[Tuple[Apartment, floa
     finally:
         # will happen any way after code try termination or exception handling
         conn.close()
+        return result
     pass
