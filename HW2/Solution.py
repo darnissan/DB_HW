@@ -208,14 +208,17 @@ def make_owner_reservations():
     attributes.append("INNER JOIN Owner o ON oa.Owner_ID = o.Owner_ID;")
     make_view("Owner_Reservations", attributes)
 
+
 def make_owner_city_apartments():
     attributes = []
-    attributes.append("SELECT Owner_ID,Name,City ")
-    attributes.append("FROM Owner_Apartments INNER JOIN Apartment_Reviews ")
-    attributes.append("ON Owner_Apartments.Owner_ID=Apartment_Reviews.Owner_ID ")
-    attributes.append("AND Owner_Apartments.Apartment_ID=Apartment_Reviews.Apartment_ID ")
+    attributes.append("SELECT Owner_Apartments.Owner_ID,Owner_Name,City,Country ")
+    attributes.append("FROM Owner_Apartments INNER JOIN Apartment")
+    # attributes.append("ON Owner_Apartments.Owner_ID=Apartment_Reviews.Owner_ID ")
+    attributes.append("ON Owner_Apartments.Apartment_ID=Apartment.Apartment_ID ")
     attributes.append("INNER JOIN Owner ON Owner_Apartments.Owner_ID= Owner.Owner_ID")
+    # attributes.append("INNER JOIN Apartment ON Owner_Apartments.Apartment_ID= Apartment.Apartment_ID")
     make_view("Owner_city_apartments", attributes)
+
 
 def make_customer_apartments():
     attributes = []
@@ -234,21 +237,20 @@ def make_customer_ratio(customer_ID):
 
 
 
-    #get ratios
     attributes = []
     attributes.append("SELECT customer_id,AVG(Cust1_apartments.rating/Apartment_Reviews.rating) AS ratio ")
-    attributes.append("FROM Apartment_Reviews GROUP BY customer_id")
+    attributes.append("FROM Apartment_Reviews")
     attributes.append("INNER JOIN Cust1_apartments ")
-    attributes.append("ON Cust1_apartments.apartment_id=Apartment_Reviews.apartment_id_ID ")
-    attributes.append("AND Apartment_Reviews.customer_id !=customer_ID")
+    attributes.append("ON Cust1_apartments.apartment_id=Apartment_Reviews.apartment_id ")
+    attributes.append("AND Apartment_Reviews.customer_id !=customer_ID GROUP BY customer_id")
     make_view("Apartment_ratios", attributes)
 
     # get approximations
     attributes = []
     attributes.append("SELECT apartment_id,GREATEST(1,LEAST(10,AVG(ratio * Apartment_Reviews.rating))) ")
-    attributes.append("FROM Apartment_Reviews GROUP BY apartment_id")
+    attributes.append("FROM Apartment_Reviews")
     attributes.append("INNER JOIN Apartment_ratios ")
-    attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id")
+    attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id GROUP BY apartment_id")
     make_view("Apartment_approximations", attributes)
 
 def add_owner(owner: Owner) -> ReturnValue:
@@ -937,12 +939,18 @@ ORDER BY o.Owner_Name;
 def get_all_location_owners() -> List[Owner]:
     # join to get cities for apartments
     conn = None
+    res=[]
     try:
         conn = Connector.DBConnector()
         make_owner_city_apartments()
-        query=("SELECT Owner_ID,Name FROM Owner_city_apartments GROUP BY name "
-              "HAVING COUNT(DISTINCT City) = (SELECT COUNT(DISTINCT City) FROM Owner_city_apartments);")
-        return conn.execute(query)
+        query = ("SELECT Owner_ID,Owner_Name FROM Owner_city_apartments GROUP BY Owner_ID,Owner_Name "
+                 "HAVING COUNT(DISTINCT CONCAT(City, ', ', Country))= (SELECT COUNT(DISTINCT CONCAT(City, ', ', Country)) FROM Apartment);")
+        op=conn.execute(query)
+        rows, owner = conn.execute(query)
+        if (owner is not None) and rows > 0:
+            for index in range(owner.size()):
+                current_row = owner[index]
+                res.append(Owner(current_row['Owner_ID'], current_row['Owner_Name']))
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -963,33 +971,46 @@ def get_all_location_owners() -> List[Owner]:
     finally:
         # will happen any way after code try termination or exception handling
         conn.close()
+        return res
     pass
 
 
 def best_value_for_money() -> Apartment:
     conn = None
+    result = None
     try:
         query = """
-                SELECT a.apartment_id, a.name, MAX(reviews_avg_rating / avg_nightly_price) AS value_for_money
-    FROM apartments a
-    JOIN (
-      SELECT r.apartment_id,
-         AVG(r.total_price / NULLIF(julianday(r.end_date) - julianday(r.start_date), 0)) AS avg_nightly_price
-      FROM reservations r
-      GROUP BY r.apartment_id
-    ) AS reservation_prices ON a.apartment_id = reservation_prices.apartment_id
-    JOIN (
-      SELECT rev.apartment_id,
-         AVG(rev.rating) AS reviews_avg_rating
-      FROM reviews rev
-      GROUP BY rev.apartment_id
-    ) AS review_ratings ON a.apartment_id = review_ratings.apartment_id
-    GROUP BY a.apartment_id, a.name
-    ORDER BY value_for_money DESC
-    LIMIT 1;
-    """
+                SELECT Apartment_ID,Address,City,Country,Size FROM (
+                SELECT a.Apartment_ID,a.Address,a.City,a.Country,a.Size, MAX(reviews_avg_rating / avg_nightly_price) AS value_for_money
+                FROM Apartment a
+                JOIN (
+                  SELECT r.Apartment_ID,
+                     AVG(r.total_price / NULLIF(r.end_date - r.start_date, 0)) AS avg_nightly_price
+                  FROM reservations r
+                  GROUP BY r.Apartment_ID
+                ) AS reservation_prices ON a.Apartment_ID= reservation_prices.apartment_id
+                JOIN (
+                  SELECT rev.apartment_id,
+                     AVG(rev.rating) AS reviews_avg_rating
+                  FROM Apartment_Reviews rev
+                  GROUP BY rev.apartment_id
+                ) AS review_ratings ON a.Apartment_ID = review_ratings.apartment_id
+                GROUP BY a.Apartment_ID,a.Address,a.City,a.Country,a.Size
+                ORDER BY value_for_money DESC
+                LIMIT 1);
+                """
         conn = Connector.DBConnector()
-        result = conn.execute(query)
+        rows, apartment = conn.execute(query)
+        if (apartment is not None) and rows > 0:
+            for index in range(apartment.size()):
+                current_row = apartment[index]
+                result = Apartment(
+                    current_row["Apartment_ID"],
+                    current_row["Address"],
+                    current_row["City"],
+                    current_row["Country"],
+                    current_row["Size"],
+                )
     except DatabaseException.ConnectionInvalid as e:
         # do stuff
         print(e)
@@ -1016,16 +1037,33 @@ def best_value_for_money() -> Apartment:
 
 def profit_per_month(year: int) -> List[Tuple[int, float]]:
     conn = None
+    res = []
     try:
-        query = """
-                SELECT strftime('%m', end_date) AS month, SUM(total_price * 0.15) AS profit
-                FROM reservations
-                WHERE strftime('%Y', end_date) = ?
-                GROUP BY month
-                ORDER BY month;
+        query = (
+            """
+                WITH Months AS (
+                SELECT 1 AS month_number
+                UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7
+                UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10
+                UNION ALL SELECT 11 UNION ALL SELECT 12
+                )
+                SELECT Months.month_number AS mon,COALESCE(CAST(SUM(total_price * 0.15) AS FLOAT), 0) AS profit
+                FROM Months
+                LEFT JOIN reservations ON EXTRACT(MONTH FROM end_date)  = Months.month_number
+                       AND EXTRACT(YEAR FROM end_date) ="""
+            + str(year)
+            + """
+                GROUP BY mon
+                ORDER BY mon
                 """
+        )
         conn = Connector.DBConnector()
-        result = conn.execute(query, (year,))
+        rows, mp = conn.execute(query)
+        if (mp is not None) and rows > 0:
+            for index in range(mp.size()):
+                current_row = mp[index]
+                res.append((current_row["mon"], current_row["profit"]))
     except DatabaseException.ConnectionInvalid as e:
         print(e)
     except DatabaseException.NOT_NULL_VIOLATION as e:
@@ -1040,7 +1078,7 @@ def profit_per_month(year: int) -> List[Tuple[int, float]]:
         print(e)
     finally:
         conn.close()
-        return result
+        return res
     pass
 
 
