@@ -244,7 +244,7 @@ def make_customer_ratio(customer_ID):
 
     # get ratios
     attributes = []
-    attributes.append("SELECT customer_id,AVG((Cust1_apartments.rating/Apartment_Reviews.rating) AS FLOAT) AS ratio ")
+    attributes.append("SELECT customer_id,AVG(CAST(Cust1_apartments.rating AS FLOAT) / CAST(Apartment_Reviews.rating AS FLOAT)) AS ratio ")
     attributes.append("FROM Apartment_Reviews")
     attributes.append("INNER JOIN Cust1_apartments")
     attributes.append("ON (Cust1_apartments.apartment_id=Apartment_Reviews.apartment_id ")
