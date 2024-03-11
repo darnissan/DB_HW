@@ -251,14 +251,13 @@ def make_customer_ratio(customer_ID):
     attributes.append("AND Apartment_Reviews.customer_id !="+str(customer_ID)+")")
     attributes.append("GROUP BY customer_id")
     make_view("Apartment_ratios", attributes)
-
     # get approximations
     attributes = []
-    attributes.append("SELECT Apartment_Reviews.apartment_id,AVG(ratio * Apartment_Reviews.rating) AS REC")
+    attributes.append("SELECT Apartment_Reviews.apartment_id,AVG(GREATEST(1, LEAST(10, ratio * Apartment_Reviews.rating))) AS REC")
     attributes.append("FROM Apartment_Reviews")
     attributes.append("INNER JOIN Apartment_ratios ")
     attributes.append("ON Apartment_Reviews.customer_id=Apartment_ratios.customer_id ")
-    attributes.append("AND NOT EXISTS(SELECT apartment_id FROM Cust1_apartments WHERE Apartment_Reviews.apartment_id=apartment_id)")
+    attributes.append("AND NOT EXISTS(SELECT apartment_id FROM Cust1_apartments WHERE Apartment_Reviews.apartment_id=Cust1_apartments.apartment_id)")
     attributes.append("GROUP BY Apartment_Reviews.apartment_id")
     make_view("Apartment_approximations", attributes)
 
